@@ -1,0 +1,17 @@
+{
+  "name": "Pinora",
+  "version": "0.1.0-alpha",
+  "sourceCommit": "7db090d",
+  "archive": "Pinora-0.1.0-alpha.zip",
+  "archiveBytes": 104038,
+  "sha256": "7c1374e22f16d28d4cab964c101a59b35b69f39bb71c8a04b3f822147e33fcbf",
+  "validation": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "unitTestsPassed": 22,
+    "build": "passed",
+    "chromiumE2E": "passed; see acceptance.json",
+    "edgeE2E": "passed; see acceptance-msedge.json"
+  },
+  "scope": "Specification phase 1 only; 0.5 Beta and 1.0 milestones remain planned."
+}

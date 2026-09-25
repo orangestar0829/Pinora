@@ -6,4 +6,32 @@ React UI → domain services → BrowserAdapter → Chromium native bookmarks/st
 
 Settings schema v1 validates every persisted field; migrations normalize legacy unversioned values and preserve recoverable originals. Small settings and custom-image mappings live in chrome.storage.local; processed image blobs live in IndexedDB. Local appearance hint is disposable. No permissions beyond bookmarks/storage/favicon; no optional history/topSites/downloads modules this phase. Manifest CSP denies network connections, allows local/blob/data images and locally bundled code. Opening a bookmark is explicit browser navigation.
 
-Milestones: Bootstrap → Browser adapter → Bookmark tree foundation delivered. UI, folder navigation/favicon/search/CRUD drag controls, settings/theme/wallpaper presentation and real-browser acceptance belong to the next batch. Incremental event indexing, large list windowing, further startup benchmarks and packaging are later hardening; full-tree event refresh is currently deliberate simple Alpha behavior.
+The first-phase UI, folder navigation, favicon/search, native CRUD and drag, settings/themes, custom-icon cropping, local wallpaper, tests and unpacked packaging are implemented. See validation.md for evidence and remaining boundaries. Full-tree event refresh is deliberately simple Alpha behavior; rendering uses 200-item pagination rather than rendering the entire library.
+
+```mermaid
+flowchart TD
+  UI[React dashboard / dialogs / settings] --> Domain[BookmarkService / SettingsService]
+  Domain --> Adapter[BrowserAdapter]
+  Adapter --> Chrome[Chromium bookmarks / storage / favicon]
+  Chrome --> Events[Bookmark events / storage.onChanged]
+  Events --> Domain
+  UI --> Images[Safe image decode / crop / WebP encoding]
+  Images --> Assets[IndexedDB asset store]
+  Domain --> Index[Normalized tree and search index in memory]
+```
+
+## Boundaries
+
+`src/browser` alone calls browser extension APIs. A future Firefox implementation can satisfy the same interface. The explicit web preview adapter uses separate synthetic bookmarks and storage; it is never selected inside an installed extension.
+
+`src/domain` owns editable-node, cycle, URL and snapshot rules. Chromium's same-parent forward index adjustment stays in its adapter. Native API completion is authoritative; a subsequent read failure surfaces as a refresh error, not an unsuccessful save that encourages duplicate creation.
+
+`src/storage` owns schema v1, migration, cross-tab Web Locks, small settings, blobs and image sanitation. Asset writes commit before mapping updates. Failed mapping writes remove the new orphan; existing blobs remain intact for concurrent tabs.
+
+`src/features/bookmarks` owns drag zones, dialogs, context menus and the grid. `src/features/settings` owns theme/layout controls, the wallpaper layer and image crop editor. React text rendering is used for all bookmark titles; executable URL schemes never appear as actionable native link targets.
+
+## Sources and clean-room record
+
+Development started in an empty directory. The supplied functional specification is preserved in specification-v1.md. No NelliTab package, source, stylesheet, markup, source map, logo or visual asset was obtained or read. UI spacing, palette, original logo, schema, module boundaries and tests were independently authored. General-purpose Lucide icons are used under their included ISC license.
+
+Official references consulted: [Bookmarks API](https://developer.chrome.com/docs/extensions/reference/api/bookmarks), [Tabs API permissions](https://developer.chrome.com/docs/extensions/reference/api/tabs), [local favicon API](https://developer.chrome.com/docs/extensions/how-to/ui/favicons). The tabs API documentation confirms that creating and navigating tabs does not require the broad `tabs` permission. Runtime semantics were also checked against an isolated real Chromium profile.

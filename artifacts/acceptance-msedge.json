@@ -1,0 +1,24 @@
+{
+  "browser": "153.0.4234.48",
+  "profile": "I:\\code\\Pinora\\.test-profiles\\acceptance-eXJ1hj",
+  "externalRequests": [],
+  "pageErrors": [],
+  "warmReadyObservedMs": [
+    99.09999999962747,
+    90.79999999981374,
+    88.29999999981374
+  ],
+  "nativeCRUD": true,
+  "nativeBidirectionalDrag": true,
+  "crossFolderMove": true,
+  "settingsCrossTab": true,
+  "mediaRestartPersistence": true,
+  "offline": true,
+  "viewportWidths": [
+    1280,
+    1366,
+    1920,
+    2560,
+    3840
+  ]
+}

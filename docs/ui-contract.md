@@ -1,6 +1,6 @@
 # Pinora 0.1 Alpha UI contract
 
-Foundation only is complete; `src/main.tsx` is a placeholder to replace. UI owns `src/app/**`, `src/components/**`, `src/features/**`, styles and main bootstrap. All browser calls MUST remain under `src/browser/**`. No real bookmark fixtures are seeded. No new permissions or remote requests.
+The Alpha UI is implemented in `src/app/**`, `src/components/**`, `src/features/**` and `src/styles/**`. All browser calls MUST remain under `src/browser/**`. Synthetic fixtures are restricted to explicit preview mode and isolated test profiles. No real user bookmark fixtures are seeded. No optional permissions or remote requests.
 
 ## Lifecycle and reactivity
 
@@ -19,10 +19,10 @@ Import `createRuntime` from `src/domain/runtime`. Call once outside React render
 - `bookmarks.create(parentId, title, url?)`: omit url to create folder, returns created raw node.
 - `bookmarks.update(id, title, url?)`: folder rename or bookmark edit.
 - `bookmarks.remove(id, confirmedNonEmpty = false)`: nonempty folder deletion REQUIRES true after explicit UI confirmation. Confirm ordinary deletions too for user clarity.
-- `bookmarks.move(id, parentId, index?)`: target index means FINAL index in the target list after source removal; omit to append. Use `canMove(tree, id, parentId)` for visual validation. For insert-before UI derive index from target children **excluding source**, then locate target. Drag reorder same-parent forward/backward must be verified in real Chromium as API semantics are not yet smoke tested.
+- `bookmarks.move(id, parentId, index?)`: target index means FINAL index in the target list after source removal; omit to append. The Chromium adapter boundary translates same-parent forward moves to the browser's pre-removal index. Use `canMove(tree, id, parentId)` for visual validation. For insert-before UI derive index from target children **excluding source**, then locate target.
 - `bookmarks.refresh()` reloads explicitly and rejects on failure; automatic events expose `bookmarks.error`. Latest-issued snapshot wins to avoid stale responses.
 
-All writes await API completion and refresh; do not optimistically discard current tree. Refresh failure after an API success means native mutation may already have happened; prompt retry refresh, not blindly duplicate creation.
+All writes await API completion and a refresh attempt; do not optimistically discard the current tree. If the write succeeds but refreshing fails, the write resolves successfully and the dashboard exposes the read error. This closes the form and offers retrying the read, avoiding duplicate native writes.
 
 ## Open and favicon
 
@@ -59,4 +59,4 @@ Invalid individual fields reset to defaults. Unknown schema version throws and o
 
 ## Remaining verification
 
-Foundation typecheck/lint/unit/build passed. No real browser loaded yet. Root should own Playwright extension smoke, native create/edit/move/delete/event sync, same-parent reorder directions, wallpaper/icon persistence and zero external network assertion. Need PNG icons for store packaging later; SVG logo is original display asset. No extension service worker is needed for new-tab-only Alpha.
+See validation.md for current Alpha evidence. Real Chromium and Edge extension loading, native CRUD/event sync, both reorder directions, media persistence, offline loading and zero external page-request assertions have passed. Original PNG manifest icons are included. No extension service worker is needed for new-tab-only Alpha.
