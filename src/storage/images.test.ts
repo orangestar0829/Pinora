@@ -1,4 +1,19 @@
-import { expect, test } from 'vitest';
-import { prepareImage, sanitizeSvg } from './images';
-test('removes scripts, external references, event handlers and foreign content', () => { const clean = sanitizeSvg('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(1)</script><foreignObject/><image href="https://evil.test/a"/><path fill="url(https://evil.test/a)" d="M0 0h1"/><rect width="20" fill="#fff"/></svg>'); expect(clean).not.toMatch(/script|foreignObject|onload|https:|<image/); expect(clean).toContain('fill="#fff"'); expect(() => sanitizeSvg('<html/>')).toThrow(); });
-test('rejects oversize and unsupported images before decoding', async () => { await expect(prepareImage(new File(['x'], 'a.gif', { type: 'image/gif' }), 'icon')).rejects.toThrow(); const file = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'x.png', { type: 'image/png' }); await expect(prepareImage(file, 'icon')).rejects.toThrow('5 MB'); });
+import { expect, test } from "vitest";
+import { prepareImage, sanitizeSvg } from "./images";
+test("removes scripts, external references, event handlers and foreign content", () => {
+  const clean = sanitizeSvg(
+    '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(1)</script><foreignObject/><image href="https://evil.test/a"/><path fill="url(https://evil.test/a)" d="M0 0h1"/><rect width="20" fill="#fff"/></svg>',
+  );
+  expect(clean).not.toMatch(/script|foreignObject|onload|https:|<image/);
+  expect(clean).toContain('fill="#fff"');
+  expect(() => sanitizeSvg("<html/>")).toThrow();
+});
+test("rejects oversize and unsupported images before decoding", async () => {
+  await expect(
+    prepareImage(new File(["x"], "a.gif", { type: "image/gif" }), "icon"),
+  ).rejects.toThrow();
+  const file = new File([new Uint8Array(5 * 1024 * 1024 + 1)], "x.png", {
+    type: "image/png",
+  });
+  await expect(prepareImage(file, "icon")).rejects.toThrow("5 MB");
+});

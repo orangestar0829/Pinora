@@ -1,5 +1,427 @@
-import { Dialog } from '../../components/Dialog';
-import type { Runtime } from '../../app/runtime';
-export function SettingsPanel({ runtime, onClose }: { runtime: Runtime; onClose: () => void }) {
-  return <Dialog title="外观设置" onClose={onClose}><p>当前主题：{runtime.settings.value.theme}。设置面板正在接入。</p></Dialog>;
+import { useRef, useState, type ReactNode } from "react";
+import {
+  Sun,
+  Moon,
+  Monitor,
+  SlidersHorizontal,
+  Palette,
+  ImagePlus,
+  ShieldCheck,
+  RotateCcw,
+  Upload,
+  Check,
+} from "lucide-react";
+import { Dialog } from "../../components/Dialog";
+import { useRuntime, type Runtime } from "../../app/runtime";
+import { defaults, type Settings } from "../../storage/settings";
+import { prepareImage } from "../../storage/images";
+import { saveWallpaper } from "../../storage/media";
+
+export function RangeControl({
+  label,
+  value,
+  min,
+  max,
+  unit = "px",
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="range-control">
+      <span>
+        {label}
+        <output>
+          {value} {unit}
+        </output>
+      </span>
+      <input
+        type="range"
+        aria-label={label}
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="setting-field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+export function SettingsPanel({
+  runtime,
+  onClose,
+}: {
+  runtime: Runtime;
+  onClose: () => void;
+}) {
+  const { settings } = useRuntime(runtime);
+  const [tab, setTab] = useState("appearance");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const update = (mutate: (draft: Settings) => void) => {
+    setError("");
+    void runtime.settings
+      .update(mutate)
+      .catch((reason) => setError(String(reason)));
+  };
+  async function upload(file?: File) {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      await saveWallpaper(
+        runtime.settings,
+        await prepareImage(file, "wallpaper"),
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = "";
+    }
+  }
+  const tabs = [
+    { id: "appearance", label: "外观", icon: Palette },
+    { id: "layout", label: "布局", icon: SlidersHorizontal },
+    { id: "background", label: "背景", icon: ImagePlus },
+    { id: "privacy", label: "关于", icon: ShieldCheck },
+  ];
+  return (
+    <Dialog title="让这里，更像你" onClose={onClose}>
+      <div className="settings-panel">
+        <p className="settings-intro">小小调整，找到舒服的浏览节奏。</p>
+        <nav className="settings-tabs" aria-label="设置分类">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              className={tab === id ? "active" : ""}
+              aria-pressed={tab === id}
+              onClick={() => setTab(id)}
+            >
+              <Icon size={16} />
+              {label}
+            </button>
+          ))}
+        </nav>
+        {tab === "appearance" && (
+          <section className="settings-section">
+            <h3>光线与心情</h3>
+            <p>选择喜欢的主题，也可以跟随系统切换。</p>
+            <div className="theme-options">
+              {(
+                [
+                  { value: "light", label: "浅色", icon: Sun },
+                  { value: "dark", label: "深色", icon: Moon },
+                  { value: "system", label: "跟随系统", icon: Monitor },
+                ] as const
+              ).map(({ value, label, icon: Icon }) => (
+                <button
+                  className={`theme-option ${value}`}
+                  aria-pressed={settings.theme === value}
+                  key={value}
+                  onClick={() =>
+                    update((draft) => {
+                      draft.theme = value;
+                    })
+                  }
+                >
+                  <span className="theme-preview">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <span>
+                    <Icon size={15} />
+                    {label}
+                    {settings.theme === value && <Check size={15} />}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <Field label="点击书签时">
+              <select
+                value={settings.openMode}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  update((draft) => {
+                    draft.openMode = value as Settings["openMode"];
+                  });
+                }}
+              >
+                <option value="current">在当前标签页打开</option>
+                <option value="new">在新标签页打开</option>
+                <option value="background">在后台标签页打开</option>
+              </select>
+            </Field>
+            <p className="setting-hint">中键或 Ctrl / ⌘ 点击始终在后台打开。</p>
+          </section>
+        )}
+        {tab === "layout" && (
+          <section className="settings-section">
+            <h3>给每个收藏，留一点空间</h3>
+            <div className="range-columns">
+              {(
+                [
+                  ["tileSize", "卡片尺寸", 96, 240],
+                  ["iconSize", "图标尺寸", 20, 96],
+                  ["gapX", "水平间距", 4, 64],
+                  ["gapY", "垂直间距", 4, 64],
+                  ["radius", "卡片圆角", 0, 40],
+                  ["fontSize", "标题字号", 10, 24],
+                  ["maxWidth", "内容最大宽度", 640, 2400],
+                ] as const
+              ).map(([key, label, min, max]) => (
+                <RangeControl
+                  key={key}
+                  label={label}
+                  value={settings.layout[key]}
+                  min={min}
+                  max={max}
+                  onChange={(value) =>
+                    update((draft) => {
+                      draft.layout[key] = value;
+                    })
+                  }
+                />
+              ))}
+            </div>
+            <Field label="标题显示">
+              <select
+                value={settings.layout.labels}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  update((draft) => {
+                    draft.layout.labels = value as Settings["layout"]["labels"];
+                  });
+                }}
+              >
+                <option value="one">一行</option>
+                <option value="two">两行</option>
+                <option value="hidden">隐藏标题</option>
+              </select>
+            </Field>
+            <label className="toggle-control">
+              <span>显示网站域名和文件夹项目数</span>
+              <input
+                type="checkbox"
+                checked={settings.layout.showHostname}
+                onChange={(event) => {
+                  const value = event.target.checked;
+                  update((draft) => {
+                    draft.layout.showHostname = value;
+                  });
+                }}
+              />
+            </label>
+            <button
+              className="button reset-settings"
+              onClick={() =>
+                update((draft) => {
+                  draft.layout = structuredClone(defaults.layout);
+                })
+              }
+            >
+              <RotateCcw size={14} />
+              恢复默认布局
+            </button>
+          </section>
+        )}
+        {tab === "background" && (
+          <section className="settings-section">
+            <h3>为收藏选一块画布</h3>
+            <Field label="背景类型">
+              <select
+                value={settings.background.type}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  update((draft) => {
+                    draft.background.type =
+                      value as Settings["background"]["type"];
+                  });
+                }}
+              >
+                <option value="solid">纯色</option>
+                <option value="gradient">渐变</option>
+                <option value="image">本地图片</option>
+              </select>
+            </Field>
+            {settings.background.type !== "image" ? (
+              <div className="color-controls">
+                <Field
+                  label={
+                    settings.background.type === "gradient"
+                      ? "起始颜色"
+                      : "背景颜色"
+                  }
+                >
+                  <input
+                    type="color"
+                    value={settings.background.color}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      update((draft) => {
+                        draft.background.color = value;
+                      });
+                    }}
+                  />
+                </Field>
+                {settings.background.type === "gradient" && (
+                  <Field label="结束颜色">
+                    <input
+                      type="color"
+                      value={settings.background.gradientEnd}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        update((draft) => {
+                          draft.background.gradientEnd = value;
+                        });
+                      }}
+                    />
+                  </Field>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="image-upload">
+                  <ImagePlus size={28} />
+                  <strong>
+                    {settings.background.assetId
+                      ? "已保存本地壁纸"
+                      : "把喜欢的风景带进来"}
+                  </strong>
+                  <p>PNG、JPEG、WebP 或 SVG · 最大 30 MB</p>
+                  <button
+                    className="button"
+                    disabled={busy}
+                    onClick={() => input.current?.click()}
+                  >
+                    <Upload size={15} />
+                    {busy ? "正在处理…" : "选择本地图片"}
+                  </button>
+                  <input
+                    ref={input}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    aria-label="上传壁纸"
+                    onChange={(event) => void upload(event.target.files?.[0])}
+                  />
+                </div>
+                <Field label="图片适配">
+                  <select
+                    value={settings.background.fit}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      update((draft) => {
+                        draft.background.fit =
+                          value as Settings["background"]["fit"];
+                      });
+                    }}
+                  >
+                    <option value="cover">覆盖</option>
+                    <option value="contain">完整显示</option>
+                    <option value="center">居中</option>
+                    <option value="stretch">拉伸</option>
+                    <option value="tile">平铺</option>
+                  </select>
+                </Field>
+                <RangeControl
+                  label="背景模糊"
+                  value={settings.background.blur}
+                  min={0}
+                  max={40}
+                  onChange={(value) =>
+                    update((draft) => {
+                      draft.background.blur = value;
+                    })
+                  }
+                />
+                <RangeControl
+                  label="亮度"
+                  value={settings.background.brightness}
+                  min={20}
+                  max={150}
+                  unit="%"
+                  onChange={(value) =>
+                    update((draft) => {
+                      draft.background.brightness = value;
+                    })
+                  }
+                />
+                <RangeControl
+                  label="遮罩浓度"
+                  value={settings.background.overlay}
+                  min={0}
+                  max={90}
+                  unit="%"
+                  onChange={(value) =>
+                    update((draft) => {
+                      draft.background.overlay = value;
+                    })
+                  }
+                />
+              </>
+            )}
+            <button
+              className="button reset-settings"
+              onClick={() =>
+                update((draft) => {
+                  draft.background = structuredClone(defaults.background);
+                })
+              }
+            >
+              <RotateCcw size={14} />
+              恢复默认背景
+            </button>
+          </section>
+        )}
+        {tab === "privacy" && (
+          <section className="settings-section about-panel">
+            <img src="/logo.svg" width="52" height="52" alt="" />
+            <h3>
+              Pinora <span>0.1 Alpha</span>
+            </h3>
+            <p>以浏览器原生书签为中心，给每天的开始留一点秩序。</p>
+            <div className="privacy-note">
+              <ShieldCheck size={23} />
+              <div>
+                <strong>你的收藏，只属于你</strong>
+                <p>
+                  无账户、无广告、无分析统计。书签直接由浏览器管理；设置、图标和壁纸仅保存在本机。
+                </p>
+              </div>
+            </div>
+            <p>
+              本版本仅使用书签、存储和本地网站图标权限。浏览器自身启用的书签同步仍由浏览器管理。
+            </p>
+            <p>
+              这是独立设计与实现的早期版本。常用网站、历史记录、下载记录及
+              Firefox 支持列入后续阶段。
+            </p>
+          </section>
+        )}
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="settings-saved">
+          <ShieldCheck size={14} />
+          <span>修改自动保存在本机，并同步到已打开的新标签页</span>
+        </div>
+      </div>
+    </Dialog>
+  );
 }

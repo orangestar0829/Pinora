@@ -4,3 +4,7 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 .preview-profile/
+.test-profiles/
+artifacts/initial.png
+artifacts/*-probe.png
+artifacts/*.zip

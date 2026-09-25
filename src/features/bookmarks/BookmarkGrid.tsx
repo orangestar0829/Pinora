@@ -1,21 +1,403 @@
-import { useEffect, useRef, useState, type MouseEvent, type DragEvent } from 'react';
-import { MoreHorizontal, ArrowUpRight, Folder, Pencil, Trash2, MoveRight, Copy, Image, RotateCcw } from 'lucide-react';
-import { BookmarkIcon } from '../../components/BookmarkIcon';
-import type { Runtime } from '../../app/runtime';
-import { canMove, type BookmarkNode } from '../../domain/tree';
-import type { BookmarkAction } from './BookmarkDialogs';
-export function BookmarkGrid({ nodes, runtime, editing, searching, onOpen, onAction, onError }: { nodes: BookmarkNode[]; runtime: Runtime; editing: boolean; searching: boolean; onOpen: (node: BookmarkNode, event?: MouseEvent) => void; onAction: (action: BookmarkAction) => void; onError: (error: string) => void }) {
-  const [menu, setMenu] = useState<{ node: BookmarkNode; x: number; y: number }>(); const [drag, setDrag] = useState(''); const [drop, setDrop] = useState<{ id: string; zone: string; valid: boolean }>(); const grid = useRef<HTMLDivElement>(null); const menuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (!menu) return; menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus(); const close = (event: Event) => { if (!menuRef.current?.contains(event.target as Node)) setMenu(undefined); }; const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { setMenu(undefined); grid.current?.querySelector<HTMLElement>(`[data-bookmark-id="${CSS.escape(menu.node.id)}"]`)?.focus(); } }; window.addEventListener('pointerdown', close); window.addEventListener('keydown', key); return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', key); }; }, [menu]);
-  function context(node: BookmarkNode, x: number, y: number) { setMenu({ node, x: Math.max(8, Math.min(x, innerWidth - 232)), y: Math.max(8, Math.min(y, innerHeight - 410)) }); }
-  function target(event: DragEvent, node: BookmarkNode) { const rect = event.currentTarget.getBoundingClientRect(); const fraction = (event.clientX - rect.left) / rect.width; const zone = node.folder && fraction > .24 && fraction < .76 ? 'inside' : fraction < .5 ? 'before' : 'after'; const parent = zone === 'inside' ? node.id : node.parentId; return { id: node.id, zone, parent, valid: !searching && !!parent && canMove(runtime.bookmarks.tree, drag || event.dataTransfer.getData('text/pinora-bookmark'), parent) && drag !== node.id }; }
-  async function dropNode(event: DragEvent, node: BookmarkNode) { event.preventDefault(); const result = target(event, node); const source = drag || event.dataTransfer.getData('text/pinora-bookmark'); setDrop(undefined); setDrag(''); if (!result.valid || !result.parent) { onError('不能移动到此处。'); return; } const siblings = runtime.bookmarks.tree.nodes.get(result.parent)!.children.filter(id => id !== source); const index = result.zone === 'inside' ? undefined : siblings.indexOf(node.id) + (result.zone === 'after' ? 1 : 0); try { await runtime.bookmarks.move(source, result.parent, index); } catch (error) { onError(String(error)); } }
-  function run(task: () => Promise<unknown>) { setMenu(undefined); void task().catch(error => onError(String(error))); }
-  const node = menu?.node; const editable = node && !node.protected && !node.readOnly;
-  return <><div className={`bookmark-grid labels-${runtime.settings.value.layout.labels}`} ref={grid} onKeyDown={event => { const focused = document.activeElement as HTMLElement; const id = focused.closest<HTMLElement>('[data-bookmark-id]')?.dataset.bookmarkId; const current = nodes.find(n => n.id === id); if (!current || focused.tagName === 'BUTTON') return; if (event.key === 'F2' || event.key === 'Delete') { if (!current.protected && !current.readOnly) { event.preventDefault(); onAction({ kind: event.key === 'F2' ? 'edit' : 'delete', node: current }); } } if (event.key.startsWith('Arrow')) { const items = [...grid.current!.querySelectorAll<HTMLElement>('[data-bookmark-id]')]; const width = items[0]?.getBoundingClientRect().width ?? 148; const columns = Math.max(1, Math.round((grid.current!.clientWidth + runtime.settings.value.layout.gapX) / (width + runtime.settings.value.layout.gapX))); const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowDown' ? columns : -columns; event.preventDefault(); items[Math.max(0, Math.min(items.length - 1, nodes.indexOf(current) + step))]?.focus(); } }}>
-    {nodes.map(item => <div key={item.id} className={`bookmark-tile ${drag === item.id ? 'dragging' : ''} ${drop?.id === item.id ? `drop-${drop.zone} ${drop.valid ? 'drop-valid' : 'drop-invalid'}` : ''}`} draggable={!searching && !item.protected && !item.readOnly} onDragStart={e => { setDrag(item.id); e.dataTransfer.setData('text/pinora-bookmark', item.id); e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => { setDrag(''); setDrop(undefined); }} onDragOver={e => { e.preventDefault(); const state = target(e, item); setDrop(state); e.dataTransfer.dropEffect = state.valid ? 'move' : 'none'; }} onDragLeave={() => setDrop(undefined)} onDrop={e => void dropNode(e, item)} onContextMenu={e => { e.preventDefault(); context(item, e.clientX, e.clientY); }}>
-      <a className="tile-main" data-bookmark-id={item.id} href={item.url ?? '#'} title={searching ? `${item.title}\n${item.path.map(id => runtime.bookmarks.tree.nodes.get(id)?.title).join(' / ')}\n${item.url ?? ''}` : `${item.title}${item.url ? `\n${item.url}` : ''}`} onClick={e => { e.preventDefault(); onOpen(item, e); }} onAuxClick={e => { if (e.button === 1) { e.preventDefault(); onOpen(item, e); } }} onKeyDown={e => { if (e.key === ' ' && item.folder) { e.preventDefault(); onOpen(item); } if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') { e.preventDefault(); const rect = e.currentTarget.getBoundingClientRect(); context(item, rect.left + 30, rect.top + 30); } }}><BookmarkIcon node={item} runtime={runtime}/><span className="tile-title">{item.title}</span>{runtime.settings.value.layout.showHostname && <span className="tile-meta">{item.folder ? `${item.children.length} 个项目` : item.hostname}</span>}{searching && <span className="tile-path">{item.path.slice(-2).map(id => runtime.bookmarks.tree.nodes.get(id)?.title).join(' / ')}</span>}</a>
-      <button className={`tile-menu icon-button ${editing ? 'visible' : ''}`} aria-label={`管理 ${item.title}`} onClick={e => { const rect = e.currentTarget.getBoundingClientRect(); context(item, rect.left, rect.bottom + 5); }}><MoreHorizontal size={17}/></button>{item.folder && <span className="folder-corner"><Folder size={12}/></span>}
-    </div>)}
-  </div>{menu && node && <div className="context-menu" ref={menuRef} role="menu" aria-label={`管理 ${node.title}`} style={{ left: menu.x, top: menu.y }}><div className="menu-caption">{node.title}</div><button role="menuitem" onClick={() => { setMenu(undefined); onOpen(node); }}><ArrowUpRight size={16}/>{node.folder ? '打开文件夹' : '打开'}</button>{node.url && <><button role="menuitem" onClick={() => run(() => runtime.adapter.open(node.url!, 'new'))}>在新标签页打开</button><button role="menuitem" onClick={() => run(() => runtime.adapter.open(node.url!, 'background'))}>在后台打开</button><button role="menuitem" onClick={() => run(() => navigator.clipboard.writeText(node.url!))}><Copy size={16}/>复制网址</button></>}<hr/><button role="menuitem" disabled={!editable} onClick={() => { setMenu(undefined); onAction({ kind: 'edit', node }); }}><Pencil size={16}/>{node.folder ? '重命名' : '编辑书签'}</button><button role="menuitem" disabled={!editable} onClick={() => { setMenu(undefined); onAction({ kind: 'move', node }); }}><MoveRight size={16}/>移动到…</button><button role="menuitem" onClick={() => { setMenu(undefined); window.dispatchEvent(new CustomEvent('pinora:custom-icon', { detail: node.id })); }}><Image size={16}/>自定义图标</button><button role="menuitem" disabled={!runtime.settings.value.iconMappings[node.id]} onClick={() => run(() => runtime.settings.update(d => { delete d.iconMappings[node.id]; }))}><RotateCcw size={16}/>重置图标</button><hr/><button className="danger-text" role="menuitem" disabled={!editable} onClick={() => { setMenu(undefined); onAction({ kind: 'delete', node }); }}><Trash2 size={16}/>删除</button></div>}</>;
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type DragEvent,
+} from "react";
+import {
+  MoreHorizontal,
+  ArrowUpRight,
+  Folder,
+  Pencil,
+  Trash2,
+  MoveRight,
+  Copy,
+  Image,
+  RotateCcw,
+} from "lucide-react";
+import { BookmarkIcon } from "../../components/BookmarkIcon";
+import type { Runtime } from "../../app/runtime";
+import { canMove, type BookmarkNode } from "../../domain/tree";
+import type { BookmarkAction } from "./BookmarkDialogs";
+import { safeHref } from "../../domain/url";
+export function BookmarkGrid({
+  nodes,
+  runtime,
+  editing,
+  searching,
+  onOpen,
+  onAction,
+  onError,
+}: {
+  nodes: BookmarkNode[];
+  runtime: Runtime;
+  editing: boolean;
+  searching: boolean;
+  onOpen: (node: BookmarkNode, event?: MouseEvent) => void;
+  onAction: (action: BookmarkAction) => void;
+  onError: (error: string) => void;
+}) {
+  const [menu, setMenu] = useState<{
+    node: BookmarkNode;
+    x: number;
+    y: number;
+  }>();
+  const [drag, setDrag] = useState("");
+  const [drop, setDrop] = useState<{
+    id: string;
+    zone: string;
+    valid: boolean;
+  }>();
+  const grid = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const close = (event: Event) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenu(undefined);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenu(undefined);
+        grid.current
+          ?.querySelector<HTMLElement>(
+            `[data-bookmark-id="${CSS.escape(menu.node.id)}"]`,
+          )
+          ?.focus();
+      }
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", key);
+    };
+  }, [menu]);
+  function context(node: BookmarkNode, x: number, y: number) {
+    setMenu({
+      node,
+      x: Math.max(8, Math.min(x, innerWidth - 232)),
+      y: Math.max(8, Math.min(y, innerHeight - 410)),
+    });
+  }
+  function target(event: DragEvent, node: BookmarkNode) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const fraction = (event.clientX - rect.left) / rect.width;
+    const zone =
+      node.folder && fraction > 0.24 && fraction < 0.76
+        ? "inside"
+        : fraction < 0.5
+          ? "before"
+          : "after";
+    const parent = zone === "inside" ? node.id : node.parentId;
+    return {
+      id: node.id,
+      zone,
+      parent,
+      valid:
+        !searching &&
+        !!parent &&
+        canMove(
+          runtime.bookmarks.tree,
+          drag || event.dataTransfer.getData("text/pinora-bookmark"),
+          parent,
+        ) &&
+        drag !== node.id,
+    };
+  }
+  async function dropNode(event: DragEvent, node: BookmarkNode) {
+    event.preventDefault();
+    const result = target(event, node);
+    const source = drag || event.dataTransfer.getData("text/pinora-bookmark");
+    setDrop(undefined);
+    setDrag("");
+    if (!result.valid || !result.parent) {
+      onError("不能移动到此处。");
+      return;
+    }
+    const siblings = runtime.bookmarks.tree.nodes
+      .get(result.parent)!
+      .children.filter((id) => id !== source);
+    const index =
+      result.zone === "inside"
+        ? undefined
+        : siblings.indexOf(node.id) + (result.zone === "after" ? 1 : 0);
+    try {
+      await runtime.bookmarks.move(source, result.parent, index);
+    } catch (error) {
+      onError(String(error));
+    }
+  }
+  function run(task: () => Promise<unknown>) {
+    setMenu(undefined);
+    void task().catch((error) => onError(String(error)));
+  }
+  const node = menu?.node;
+  const editable = node && !node.protected && !node.readOnly;
+  return (
+    <>
+      <div
+        className={`bookmark-grid labels-${runtime.settings.value.layout.labels}`}
+        ref={grid}
+        onKeyDown={(event) => {
+          const focused = document.activeElement as HTMLElement;
+          const id =
+            focused.closest<HTMLElement>("[data-bookmark-id]")?.dataset
+              .bookmarkId;
+          const current = nodes.find((n) => n.id === id);
+          if (!current || focused.tagName === "BUTTON") return;
+          if (event.key === "F2" || event.key === "Delete") {
+            if (!current.protected && !current.readOnly) {
+              event.preventDefault();
+              onAction({
+                kind: event.key === "F2" ? "edit" : "delete",
+                node: current,
+              });
+            }
+          }
+          if (event.key.startsWith("Arrow")) {
+            const items = [
+              ...grid.current!.querySelectorAll<HTMLElement>(
+                "[data-bookmark-id]",
+              ),
+            ];
+            const width = items[0]?.getBoundingClientRect().width ?? 148;
+            const columns = Math.max(
+              1,
+              Math.round(
+                (grid.current!.clientWidth +
+                  runtime.settings.value.layout.gapX) /
+                  (width + runtime.settings.value.layout.gapX),
+              ),
+            );
+            const step =
+              event.key === "ArrowRight"
+                ? 1
+                : event.key === "ArrowLeft"
+                  ? -1
+                  : event.key === "ArrowDown"
+                    ? columns
+                    : -columns;
+            event.preventDefault();
+            items[
+              Math.max(
+                0,
+                Math.min(items.length - 1, nodes.indexOf(current) + step),
+              )
+            ]?.focus();
+          }
+        }}
+      >
+        {nodes.map((item) => (
+          <div
+            key={item.id}
+            className={`bookmark-tile ${drag === item.id ? "dragging" : ""} ${drop?.id === item.id ? `drop-${drop.zone} ${drop.valid ? "drop-valid" : "drop-invalid"}` : ""}`}
+            draggable={!searching && !item.protected && !item.readOnly}
+            onDragStart={(e) => {
+              setDrag(item.id);
+              e.dataTransfer.setData("text/pinora-bookmark", item.id);
+              e.dataTransfer.effectAllowed = "move";
+            }}
+            onDragEnd={() => {
+              setDrag("");
+              setDrop(undefined);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              const state = target(e, item);
+              setDrop(state);
+              e.dataTransfer.dropEffect = state.valid ? "move" : "none";
+            }}
+            onDragLeave={() => setDrop(undefined)}
+            onDrop={(e) => void dropNode(e, item)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              context(item, e.clientX, e.clientY);
+            }}
+          >
+            <a
+              className="tile-main"
+              data-bookmark-id={item.id}
+              href={safeHref(item.url)}
+              title={
+                searching
+                  ? `${item.title}\n${item.path.map((id) => runtime.bookmarks.tree.nodes.get(id)?.title).join(" / ")}\n${item.url ?? ""}`
+                  : `${item.title}${item.url ? `\n${item.url}` : ""}`
+              }
+              onClick={(e) => {
+                e.preventDefault();
+                onOpen(item, e);
+              }}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault();
+                  onOpen(item, e);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === " " && item.folder) {
+                  e.preventDefault();
+                  onOpen(item);
+                }
+                if (
+                  (e.shiftKey && e.key === "F10") ||
+                  e.key === "ContextMenu"
+                ) {
+                  e.preventDefault();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  context(item, rect.left + 30, rect.top + 30);
+                }
+              }}
+            >
+              <BookmarkIcon node={item} runtime={runtime} />
+              <span className="tile-title">{item.title}</span>
+              {runtime.settings.value.layout.showHostname && (
+                <span className="tile-meta">
+                  {item.folder
+                    ? `${item.children.length} 个项目`
+                    : item.hostname}
+                </span>
+              )}
+              {searching && (
+                <span className="tile-path">
+                  {item.path
+                    .slice(-2)
+                    .map((id) => runtime.bookmarks.tree.nodes.get(id)?.title)
+                    .join(" / ")}
+                </span>
+              )}
+            </a>
+            <button
+              className={`tile-menu icon-button ${editing ? "visible" : ""}`}
+              aria-label={`管理 ${item.title}`}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                context(item, rect.left, rect.bottom + 5);
+              }}
+            >
+              <MoreHorizontal size={17} />
+            </button>
+            {item.folder && (
+              <span className="folder-corner">
+                <Folder size={12} />
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      {menu && node && (
+        <div
+          className="context-menu"
+          ref={menuRef}
+          role="menu"
+          aria-label={`管理 ${node.title}`}
+          style={{ left: menu.x, top: menu.y }}
+        >
+          <div className="menu-caption">{node.title}</div>
+          <button
+            role="menuitem"
+            onClick={() => {
+              setMenu(undefined);
+              onOpen(node);
+            }}
+          >
+            <ArrowUpRight size={16} />
+            {node.folder ? "打开文件夹" : "打开"}
+          </button>
+          {node.url && (
+            <>
+              <button
+                role="menuitem"
+                onClick={() =>
+                  run(() => runtime.adapter.open(node.url!, "new"))
+                }
+              >
+                在新标签页打开
+              </button>
+              <button
+                role="menuitem"
+                onClick={() =>
+                  run(() => runtime.adapter.open(node.url!, "background"))
+                }
+              >
+                在后台打开
+              </button>
+              <button
+                role="menuitem"
+                onClick={() =>
+                  run(() => navigator.clipboard.writeText(node.url!))
+                }
+              >
+                <Copy size={16} />
+                复制网址
+              </button>
+            </>
+          )}
+          <hr />
+          <button
+            role="menuitem"
+            disabled={!editable}
+            onClick={() => {
+              setMenu(undefined);
+              onAction({ kind: "edit", node });
+            }}
+          >
+            <Pencil size={16} />
+            {node.folder ? "重命名" : "编辑书签"}
+          </button>
+          <button
+            role="menuitem"
+            disabled={!editable}
+            onClick={() => {
+              setMenu(undefined);
+              onAction({ kind: "move", node });
+            }}
+          >
+            <MoveRight size={16} />
+            移动到…
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => {
+              setMenu(undefined);
+              window.dispatchEvent(
+                new CustomEvent("pinora:custom-icon", { detail: node.id }),
+              );
+            }}
+          >
+            <Image size={16} />
+            自定义图标
+          </button>
+          <button
+            role="menuitem"
+            disabled={!runtime.settings.value.iconMappings[node.id]}
+            onClick={() =>
+              run(() =>
+                runtime.settings.update((d) => {
+                  delete d.iconMappings[node.id];
+                }),
+              )
+            }
+          >
+            <RotateCcw size={16} />
+            重置图标
+          </button>
+          <hr />
+          <button
+            className="danger-text"
+            role="menuitem"
+            disabled={!editable}
+            onClick={() => {
+              setMenu(undefined);
+              onAction({ kind: "delete", node });
+            }}
+          >
+            <Trash2 size={16} />
+            删除
+          </button>
+        </div>
+      )}
+    </>
+  );
 }
