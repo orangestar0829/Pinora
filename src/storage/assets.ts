@@ -1,0 +1,7 @@
+let database: Promise<IDBDatabase> | undefined;
+function open(): Promise<IDBDatabase> {
+  database ??= new Promise((resolve, reject) => { if (!globalThis.indexedDB) { reject(new Error('此环境无法使用本地图片存储。')); return; } const request = indexedDB.open('pinora-assets', 1); request.onupgradeneeded = () => { request.result.createObjectStore('assets'); }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(new Error('打开本地图片存储失败。')); request.onblocked = () => reject(new Error('本地图片存储被其他页面占用，请关闭旧页面后重试。')); });
+  return database.catch(error => { database = undefined; throw error; });
+}
+async function operation<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> { const db = await open(); return new Promise((resolve, reject) => { const tx = db.transaction('assets', mode); const request = action(tx.objectStore('assets')); tx.oncomplete = () => resolve(request.result); tx.onerror = tx.onabort = () => reject(new Error(`保存或读取图片失败：${tx.error?.message ?? '存储空间不足或不可用'}`)); }); }
+export const assetStore = { async put(blob: Blob): Promise<string> { const id = crypto.randomUUID(); await operation('readwrite', store => store.put(blob, id)); return id; }, async get(id: string): Promise<Blob | undefined> { return operation('readonly', store => store.get(id)); }, async remove(id: string): Promise<void> { await operation('readwrite', store => store.delete(id)); } };

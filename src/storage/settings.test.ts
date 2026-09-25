@@ -1,0 +1,5 @@
+import { expect, test } from 'vitest';
+import { defaults, migrateSettings, SettingsService } from './settings';
+import { createPreviewAdapter } from '../browser/preview';
+test('migrates unversioned data idempotently and resets corrupt fields', () => { const first = migrateSettings({ theme: 'dark', layout: { tileSize: -4 }, background: { color: 'url(https://x)' } }); expect(first.theme).toBe('dark'); expect(first.layout.tileSize).toBe(defaults.layout.tileSize); expect(first.background.color).toBe(defaults.background.color); expect(migrateSettings(first)).toEqual(first); expect(() => migrateSettings({ schemaVersion: 99 })).toThrow(); expect(migrateSettings(null)).toEqual(defaults); });
+test('serializes rapid updates without dropping fields', async () => { localStorage.clear(); const service = new SettingsService(createPreviewAdapter()); await service.start(); await Promise.all([service.update(s => { s.theme = 'dark'; }), service.update(s => { s.layout.iconSize = 60; })]); expect(service.value.theme).toBe('dark'); expect(service.value.layout.iconSize).toBe(60); service.stop(); });
