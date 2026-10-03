@@ -10,25 +10,20 @@ import {
   Search,
   Settings,
   Plus,
-  FolderPlus,
   Pencil,
   Check,
   ChevronRight,
   Folder,
-  PanelLeftClose,
-  Menu,
-  ShieldCheck,
   ArrowUpRight,
   Bookmark,
   X,
 } from "lucide-react";
 import { getRuntime, useRuntime, type Runtime } from "./runtime";
+import { searchTree, type BookmarkNode } from "../domain/tree";
 import {
-  initialFolder,
-  searchTree,
-  canMove,
-  type BookmarkNode,
-} from "../domain/tree";
+  resolveBookmarkFolder,
+  isInBookmarkFolder,
+} from "../domain/folderScope";
 import {
   BookmarkDialog,
   type BookmarkAction,
@@ -37,6 +32,7 @@ import { BookmarkGrid } from "../features/bookmarks/BookmarkGrid";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { Background } from "../features/settings/Background";
 import { CustomIconDialog } from "../features/settings/CustomIconDialog";
+import { Dialog } from "../components/Dialog";
 
 export function App() {
   const [runtime] = useState(() => {
@@ -66,10 +62,11 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
   const [folderId, setFolderId] = useState<string>();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(false);
-  const [sidebar, setSidebar] = useState(false);
   const [action, setAction] = useState<BookmarkAction>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [iconNode, setIconNode] = useState<BookmarkNode>();
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [page, setPage] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const closeAction = useCallback(() => setAction(undefined), []);
@@ -101,17 +98,44 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
     void start();
     return () => runtime.stop();
   }, [runtime, start]);
-  const current =
-    tree.nodes.get(folderId ?? "") ?? tree.nodes.get(initialFolder(tree) ?? "");
+  const rootId = resolveBookmarkFolder(tree, settings.bookmarkFolderId);
+  const currentId =
+    folderId &&
+    tree.nodes.get(folderId)?.folder &&
+    isInBookmarkFolder(tree, folderId, rootId)
+      ? folderId
+      : rootId;
+  const current = tree.nodes.get(currentId ?? "");
+  useEffect(() => {
+    setFolderId(rootId ?? undefined);
+    setQuery("");
+    setPage(0);
+    setAction(undefined);
+    setIconNode(undefined);
+  }, [rootId, settings.bookmarkFolderId]);
+  useEffect(() => {
+    if (folderId && folderId !== currentId) {
+      setFolderId(currentId ?? undefined);
+      setQuery("");
+      setPage(0);
+    }
+  }, [folderId, currentId]);
   const searching = !!query.trim();
   const results = searching
-    ? searchTree(tree, query)
+    ? searchTree(tree, query).filter(
+        (node) =>
+          node.id !== rootId && isInBookmarkFolder(tree, node.id, rootId),
+      )
     : (current?.children.map((id) => tree.nodes.get(id)!) ?? []);
-  const navigate = useCallback((id: string) => {
-    setFolderId(id);
-    setQuery("");
-    setSidebar(false);
-  }, []);
+  const navigate = useCallback(
+    (id: string) => {
+      if (!tree.nodes.get(id)?.folder || !isInBookmarkFolder(tree, id, rootId))
+        return;
+      setFolderId(id);
+      setQuery("");
+    },
+    [tree, rootId],
+  );
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (document.querySelector('[role="dialog"], [role="menu"]')) return;
@@ -121,12 +145,13 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
       }
       if (event.key === "Escape" && !action && !settingsOpen && !iconNode) {
         if (query) setQuery("");
-        else if (current?.parentId) navigate(current.parentId);
+        else if (current?.parentId && current.id !== rootId)
+          navigate(current.parentId);
       }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [action, settingsOpen, iconNode, query, current, navigate]);
+  }, [action, settingsOpen, iconNode, query, current, navigate, rootId]);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
@@ -174,104 +199,43 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
   } as CSSProperties;
   const writable =
     current && !current.readOnly && current.parentId !== undefined;
-  const roots = tree.roots.flatMap((id) => tree.nodes.get(id)?.children ?? []);
-  function sidebarNode(id: string, depth = 0): React.ReactNode {
-    const node = tree.nodes.get(id);
-    if (!node?.folder || depth > 5) return null;
-    return (
-      <div key={id}>
-        <button
-          className={`nav-folder ${current?.id === id ? "active" : ""}`}
-          style={{ paddingLeft: 14 + depth * 15 }}
-          onClick={() => navigate(id)}
-          onDragOver={(e) => {
-            if (!searching) e.preventDefault();
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            const source = e.dataTransfer.getData("text/pinora-bookmark");
-            if (canMove(tree, source, id))
-              void runtime.bookmarks
-                .move(source, id)
-                .catch((reason) => setError(String(reason)));
-            else setError("不能移到此文件夹。");
-          }}
-        >
-          <Folder size={17} />
-          <span>{node.title}</span>
-          <small>{node.children.length}</small>
-        </button>
-        {node.children.map((child) => sidebarNode(child, depth + 1))}
-      </div>
-    );
-  }
+  const breadcrumbs = current
+    ? [...current.path, current.id].filter((id) =>
+        isInBookmarkFolder(tree, id, rootId),
+      )
+    : [];
   return (
-    <div
-      className={`shell ${sidebar ? "sidebar-visible" : ""}`}
-      style={variables}
-    >
+    <div className="shell" style={variables}>
       <Background settings={settings} />
-      <aside className="sidebar">
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            if (initialFolder(tree)) navigate(initialFolder(tree)!);
-          }}
-        >
-          <img src="/logo.svg" alt="" />
-          <span>
-            Pinora<small>留住灵感，自在出发</small>
-          </span>
-        </a>
-        <button
-          className="sidebar-dismiss icon-button"
-          aria-label="收起侧栏"
-          onClick={() => setSidebar(false)}
-        >
-          <PanelLeftClose size={20} />
-        </button>
-        <div className="nav-heading">
-          我的书签 <span>LIBRARY</span>
-        </div>
-        <nav aria-label="书签文件夹">{roots.map((id) => sidebarNode(id))}</nav>
-        <div className="sidebar-bottom">
-          <div>
-            <ShieldCheck size={17} />
-            <span>只在你的浏览器里</span>
-          </div>
-          <p>原生书签 · 本地存储 · 无遥测</p>
-          <span className="version">PINORA / 0.1 ALPHA</span>
-        </div>
-      </aside>
-      {sidebar && (
-        <button
-          className="sidebar-scrim"
-          aria-label="关闭导航"
-          onClick={() => setSidebar(false)}
-        />
-      )}
       <div className="workspace">
         <header className="topbar">
-          <button
-            className="icon-button mobile-menu"
-            aria-label="展开侧栏"
-            onClick={() => setSidebar(true)}
+          <a
+            className="brand"
+            href="#"
+            aria-label="Pinora，返回所选文件夹"
+            onClick={(event) => {
+              event.preventDefault();
+              if (rootId) navigate(rootId);
+            }}
           >
-            <Menu size={20} />
-          </button>
+            <img src="/logo.svg" alt="" />
+            <span>
+              Pinora<small>留住灵感，自在出发</small>
+            </span>
+          </a>
           <div className="breadcrumbs" aria-label="当前位置">
             <Bookmark size={16} />
-            {current &&
-              [...current.path, current.id].map((id) => (
-                <span key={id}>
-                  <ChevronRight size={13} />
-                  <button onClick={() => navigate(id)}>
-                    {tree.nodes.get(id)?.title}
-                  </button>
-                </span>
-              ))}
+            {breadcrumbs.map((id) => (
+              <span key={id}>
+                <ChevronRight size={13} />
+                <button
+                  title={tree.nodes.get(id)?.title}
+                  onClick={() => navigate(id)}
+                >
+                  {tree.nodes.get(id)?.title}
+                </button>
+              </span>
+            ))}
           </div>
           <div className="topbar-right">
             <label className="search">
@@ -312,27 +276,44 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
               示例预览 · 以下为合成书签，不会修改你的浏览器书签
             </div>
           )}
-          {(error || runtime.bookmarks.error || runtime.settings.error) && (
+          {(error ||
+            runtime.bookmarks.error ||
+            runtime.settings.error ||
+            runtime.settings.maintenanceError) && (
             <div className="error-banner" role="alert">
               <span>
-                {error || runtime.bookmarks.error || runtime.settings.error}
+                {error ||
+                  runtime.bookmarks.error ||
+                  runtime.settings.error ||
+                  runtime.settings.maintenanceError}
               </span>
               <button
                 onClick={() => {
                   setError("");
-                  void (ready ? runtime.bookmarks.refresh() : start()).catch(
-                    (reason) => setError(String(reason)),
-                  );
+                  void (
+                    ready
+                      ? Promise.all([
+                          runtime.settings.refresh(),
+                          runtime.bookmarks.refresh(),
+                          runtime.retryMaintenance(),
+                        ])
+                      : start()
+                  ).catch((reason) => setError(String(reason)));
                 }}
               >
                 重试读取
               </button>
+              {runtime.settings.needsRecovery && (
+                <button onClick={() => setRecoveryOpen(true)}>
+                  恢复默认设置…
+                </button>
+              )}
             </div>
           )}
           <section className="collection-heading">
-            <div>
+            <div className="collection-summary">
               <div className="eyebrow">YOUR LITTLE CORNER OF THE WEB</div>
-              <h1>
+              <h1 title={searching ? undefined : current?.title}>
                 {searching ? "找到你的下一站" : current?.title || "我的书签"}
                 <span className="heading-dot">.</span>
               </h1>
@@ -353,17 +334,6 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
                 {editing ? "完成" : "整理"}
               </button>
               <button
-                className="button"
-                disabled={!writable}
-                onClick={() =>
-                  writable &&
-                  setAction({ kind: "create-folder", parentId: current.id })
-                }
-              >
-                <FolderPlus size={17} />
-                <span>新建文件夹</span>
-              </button>
-              <button
                 className="button primary"
                 disabled={!writable}
                 onClick={() =>
@@ -382,8 +352,23 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
               <h2>正在整理你的书签…</h2>
               <p>从浏览器读取，保持原来的样子。</p>
             </div>
+          ) : !current ? (
+            <div className="empty-state">
+              <span className="empty-icon">
+                <Folder size={32} />
+              </span>
+              <h2>书签文件夹不可用</h2>
+              <p>所选文件夹可能已被删除，请在设置中重新选择书签文件夹。</p>
+              <button
+                className="button primary"
+                onClick={() => setSettingsOpen(true)}
+              >
+                选择书签文件夹
+              </button>
+            </div>
           ) : results.length ? (
             <BookmarkGrid
+              key={`${rootId}:${currentId}`}
               nodes={results.slice(
                 Math.min(
                   page,
@@ -406,13 +391,13 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
           ) : (
             <div className="empty-state">
               <span className="empty-icon">
-                {searching ? <Search size={32} /> : <FolderPlus size={32} />}
+                {searching ? <Search size={32} /> : <Folder size={32} />}
               </span>
               <h2>{searching ? "暂时没有找到" : "为下一次灵感留个位置"}</h2>
               <p>
                 {searching
                   ? "试试更短的关键词，或搜索网址与文件夹名称。"
-                  : "添加一个书签，或把浏览器中的书签拖入这个文件夹。"}
+                  : "添加一个书签，或在浏览器书签管理器中整理这个文件夹。"}
               </p>
               {!searching && writable && (
                 <button
@@ -457,6 +442,51 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
           </footer>
         </main>
       </div>
+      {recoveryOpen && (
+        <Dialog
+          title="恢复默认设置"
+          onClose={() => {
+            if (!recovering) setRecoveryOpen(false);
+          }}
+        >
+          <p>
+            将先备份当前设置，再恢复默认书签文件夹、主题、布局、背景和图标设置。浏览器原生书签不会改变。
+          </p>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <footer>
+            <button
+              className="button"
+              disabled={recovering}
+              onClick={() => setRecoveryOpen(false)}
+            >
+              取消
+            </button>
+            <button
+              className="button primary"
+              disabled={recovering}
+              onClick={async () => {
+                setRecovering(true);
+                setError("");
+                try {
+                  await runtime.settings.resetToDefaults();
+                  if (!ready) await start();
+                  setRecoveryOpen(false);
+                } catch (reason) {
+                  setError(String(reason));
+                } finally {
+                  setRecovering(false);
+                }
+              }}
+            >
+              {recovering ? "正在备份并恢复…" : "备份并恢复默认"}
+            </button>
+          </footer>
+        </Dialog>
+      )}
       {action && (
         <BookmarkDialog
           key={JSON.stringify(action)}

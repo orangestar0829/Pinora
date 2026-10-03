@@ -5,6 +5,7 @@ export class BookmarkService {
   tree: BookmarkTree = normalizeTree([]);
   private listeners = new Set<() => void>();
   private generation = 0;
+  private latestRefresh?: Promise<void>;
   private dispose?: () => void;
   error: string | null = null;
   constructor(readonly adapter: BrowserAdapter) {}
@@ -24,14 +25,30 @@ export class BookmarkService {
         /* error exposed in state */
       });
     });
-    await this.refresh();
+    let pending = this.refresh();
+    for (;;) {
+      try {
+        await pending;
+      } catch (error) {
+        if (pending === this.latestRefresh) throw error;
+      }
+      // An event can supersede the initial read. Startup must follow that read
+      // before consumers treat the tree as authoritative (including icon cleanup).
+      if (!this.latestRefresh) throw new Error("书签读取已停止。");
+      if (pending === this.latestRefresh) return;
+      pending = this.latestRefresh;
+    }
   }
   stop() {
     this.dispose?.();
     this.generation++;
+    this.latestRefresh = undefined;
   }
-  async refresh() {
-    const generation = ++this.generation;
+  refresh() {
+    this.latestRefresh = this.load(++this.generation);
+    return this.latestRefresh;
+  }
+  private async load(generation: number) {
     try {
       const raw = await this.adapter.getTree();
       if (generation !== this.generation) return;
@@ -85,7 +102,8 @@ export class BookmarkService {
     const node = this.editable(id);
     if (node.children.length && !confirmedNonEmpty)
       throw new Error("删除此文件夹将删除其中的所有书签，请明确确认。");
-    await this.adapter.remove(id, node.folder);
+    // Let the native non-recursive operation reject an unexpected new child.
+    await this.adapter.remove(id, node.folder && confirmedNonEmpty);
     await this.syncAfterWrite();
   }
   // index is the FINAL zero-based position after removing the source from its old list.

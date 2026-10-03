@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Upload } from "lucide-react";
 import { Dialog } from "../../components/Dialog";
 import type { Runtime } from "../../app/runtime";
@@ -22,6 +22,10 @@ export function CustomIconDialog({
   const [y, setY] = useState(50);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const saving = useRef(false);
+  const close = useCallback(() => {
+    if (!saving.current) onClose();
+  }, [onClose]);
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     let active = true;
@@ -79,7 +83,8 @@ export function CustomIconDialog({
     ctx.drawImage(source, cropX, cropY, size, size, 0, 0, 256, 256);
   }, [source, size, cropX, cropY]);
   async function save() {
-    if (!file || !source) return;
+    if (!file || !source || saving.current) return;
+    saving.current = true;
     setBusy(true);
     setError("");
     try {
@@ -95,11 +100,12 @@ export function CustomIconDialog({
     } catch (reason) {
       setError(String(reason));
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
   return (
-    <Dialog title={`自定义图标 · ${node.title}`} onClose={onClose}>
+    <Dialog title={`自定义图标 · ${node.title}`} onClose={close}>
       <div className="icon-editor">
         <p>裁剪一块喜欢的图案。保存为 128 × 128 WebP，保留透明区域。</p>
         <div className="crop-preview">
@@ -119,6 +125,7 @@ export function CustomIconDialog({
           选择图标
           <input
             type="file"
+            disabled={busy}
             accept="image/png,image/jpeg,image/webp,image/svg+xml"
             aria-label="上传自定义图标"
             onChange={(event) => setFile(event.target.files?.[0])}
@@ -159,7 +166,7 @@ export function CustomIconDialog({
           </p>
         )}
         <footer>
-          <button className="button" onClick={onClose}>
+          <button className="button" disabled={busy} onClick={close}>
             取消
           </button>
           <button

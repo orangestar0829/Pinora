@@ -26,7 +26,7 @@ flowchart TD
 
 `src/domain` owns editable-node, cycle, URL and snapshot rules. Chromium's same-parent forward index adjustment stays in its adapter. Native API completion is authoritative; a subsequent read failure surfaces as a refresh error, not an unsuccessful save that encourages duplicate creation.
 
-`src/storage` owns schema v1, migration, cross-tab Web Locks, small settings, blobs and image sanitation. Asset writes commit before mapping updates. Failed mapping writes remove the new orphan; existing blobs remain intact for concurrent tabs.
+`src/storage` owns schema v1, migration, cross-tab Web Locks, small settings, blobs and image sanitation. Asset writes commit before mapping updates. Failed or cancelled mapping writes remove the new orphan. Successful replacements become eligible for collection only after 24 hours without current or recovery references. Collection and media commits acquire the asset lock before the settings lock; maintenance reads raw settings under that lock and never deletes without cross-tab locking. See audit-remediation.md for race regressions and validation boundaries.
 
 `src/features/bookmarks` owns drag zones, dialogs, context menus and the grid. `src/features/settings` owns theme/layout controls, the wallpaper layer and image crop editor. React text rendering is used for all bookmark titles; executable URL schemes never appear as actionable native link targets.
 

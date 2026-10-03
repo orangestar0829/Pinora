@@ -1,17 +1,19 @@
 {
   "name": "Pinora",
   "version": "0.1.0-alpha",
-  "sourceCommit": "7db090d",
+  "sourceCommit": "0832b5d",
+  "sourceWorkingTreeModified": true,
+  "sourceNote": "Includes the working-tree fixes for deletion confirmation, startup icon cleanup and long folder titles.",
   "archive": "Pinora-0.1.0-alpha.zip",
-  "archiveBytes": 104038,
-  "sha256": "7c1374e22f16d28d4cab964c101a59b35b69f39bb71c8a04b3f822147e33fcbf",
+  "archiveBytes": 104310,
+  "sha256": "3e78345ce6395b4ae01738d6ebc32ed84f052af2a4cc2651a199da4c6190aed2",
   "validation": {
     "typecheck": "passed",
     "lint": "passed",
-    "unitTestsPassed": 22,
+    "unitTestsPassed": 27,
     "build": "passed",
-    "chromiumE2E": "passed; see acceptance.json",
-    "edgeE2E": "passed; see acceptance-msedge.json"
+    "chromiumE2E": "3 passed; Alpha workflow, deletion race and long titles; final two-line layout rechecked",
+    "edgeE2E": "3 passed; Alpha workflow, deletion race and long titles; final two-line layout rechecked"
   },
   "scope": "Specification phase 1 only; 0.5 Beta and 1.0 milestones remain planned."
 }

@@ -3,6 +3,7 @@ export interface Settings {
   schemaVersion: 1;
   theme: "light" | "dark" | "system";
   openMode: OpenMode;
+  bookmarkFolderId: string | null;
   layout: {
     tileSize: number;
     iconSize: number;
@@ -30,6 +31,7 @@ export const defaults: Settings = {
   schemaVersion: 1,
   theme: "light",
   openMode: "current",
+  bookmarkFolderId: null,
   layout: {
     tileSize: 148,
     iconSize: 40,
@@ -106,6 +108,11 @@ export function migrateSettings(value: unknown): Settings {
     schemaVersion: 1,
     theme: pick(data.theme, ["light", "dark", "system"], d.theme),
     openMode: pick(data.openMode, ["current", "new", "background"], d.openMode),
+    bookmarkFolderId:
+      typeof data.bookmarkFolderId === "string" &&
+      /^[a-zA-Z\d_-]{1,128}$/.test(data.bookmarkFolderId)
+        ? data.bookmarkFolderId
+        : null,
     layout: {
       tileSize: number(l.tileSize, 96, 240, d.layout.tileSize),
       iconSize: number(l.iconSize, 20, 96, d.layout.iconSize),
@@ -141,12 +148,34 @@ export function migrateSettings(value: unknown): Settings {
   };
 }
 const KEY = "pinora.settings";
+function canonicalJson(value: unknown): string | undefined {
+  return JSON.stringify(value, (_key, entry: unknown) =>
+    entry && typeof entry === "object" && !Array.isArray(entry)
+      ? Object.fromEntries(
+          Object.entries(entry).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : entry,
+  );
+}
 export class SettingsService {
   value = migrateSettings(undefined);
   error: string | null = null;
+  needsRecovery = false;
+  private maintenanceErrors = new Map<string, string>();
+  get maintenanceError(): string | null {
+    return [...this.maintenanceErrors.values()].join("\n") || null;
+  }
+  reportMaintenanceError(source: "assets" | "icons", message: string | null) {
+    if ((this.maintenanceErrors.get(source) ?? null) === message) return;
+    if (message) this.maintenanceErrors.set(source, message);
+    else this.maintenanceErrors.delete(source);
+    this.listeners.forEach((listener) => listener());
+  }
   private listeners = new Set<() => void>();
   private queue: Promise<unknown> = Promise.resolve();
   private dispose?: () => void;
+  private revision = 0;
+  private refreshGeneration = 0;
   constructor(private adapter: BrowserAdapter) {}
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -156,6 +185,9 @@ export class SettingsService {
   };
   private apply(raw: unknown) {
     this.value = migrateSettings(raw);
+    this.revision++;
+    this.error = null;
+    this.needsRecovery = false;
     try {
       localStorage.setItem("pinora.theme", this.value.theme);
     } catch {
@@ -166,39 +198,65 @@ export class SettingsService {
   async start() {
     this.dispose?.();
     this.dispose = this.adapter.onStorageChanged(KEY, (raw) => {
+      // Even invalid newer data must supersede an earlier initial read.
+      this.revision++;
       try {
         this.apply(raw);
       } catch (error) {
         this.error = String(error);
+        this.needsRecovery = true;
         this.listeners.forEach((l) => l());
       }
     });
-    const raw = await this.adapter.read(KEY);
+    await this.refresh();
+  }
+  async refresh() {
+    const generation = ++this.refreshGeneration;
+    const revision = this.revision;
+    const isCurrent = () =>
+      generation === this.refreshGeneration && revision === this.revision;
+    let raw: unknown;
     try {
-      const migrated = migrateSettings(raw);
-      if (raw !== undefined && JSON.stringify(raw) !== JSON.stringify(migrated))
-        await this.adapter.write("pinora.settings.recovery", raw);
-      this.apply(migrated);
+      raw = await this.adapter.read(KEY);
     } catch (error) {
-      if (raw !== undefined)
-        await this.adapter.write("pinora.settings.recovery", raw);
-      this.error = String(error);
-      this.listeners.forEach((l) => l());
+      if (isCurrent()) throw error;
+      return;
     }
+    if (!isCurrent()) return;
+    const backupCurrent = () =>
+      this.enqueue(async () => {
+        if (!isCurrent()) return false;
+        const latest = await this.adapter.read(KEY);
+        if (!isCurrent() || canonicalJson(latest) !== canonicalJson(raw))
+          return false;
+        if (raw !== undefined)
+          await this.adapter.write("pinora.settings.recovery", raw);
+        return isCurrent();
+      });
+    let migrated: Settings;
+    try {
+      migrated = migrateSettings(raw);
+    } catch (error) {
+      if (!(await backupCurrent())) return;
+      this.error = String(error);
+      this.needsRecovery = true;
+      this.listeners.forEach((l) => l());
+      return;
+    }
+    if (
+      raw !== undefined &&
+      canonicalJson(raw) !== canonicalJson(migrated) &&
+      !(await backupCurrent())
+    )
+      return;
+    if (isCurrent()) this.apply(migrated);
   }
   stop() {
+    this.refreshGeneration++;
     this.dispose?.();
+    this.dispose = undefined;
   }
-  // Mutate a validated fresh draft. Cross-tab Web Locks prevent lost read/modify/write updates.
-  update(mutator: (draft: Settings) => void): Promise<void> {
-    const action = async () => {
-      const draft = migrateSettings(await this.adapter.read(KEY));
-      mutator(draft);
-      const next = migrateSettings(draft);
-      await this.adapter.write(KEY, next);
-      this.error = null;
-      this.apply(next);
-    };
+  private enqueue<T>(action: () => Promise<T>): Promise<T> {
     const locked = () =>
       navigator.locks
         ? navigator.locks.request("pinora.settings", action)
@@ -207,13 +265,53 @@ export class SettingsService {
     this.queue = result.catch(() => undefined);
     return result;
   }
-  async pruneIcons(validIds: Set<string>) {
+  withStoredSettings<T>(
+    action: (current: Settings, recovery: unknown, raw: unknown) => Promise<T>,
+  ): Promise<T> {
+    return this.enqueue(async () => {
+      const raw = await this.adapter.read(KEY);
+      return action(
+        migrateSettings(raw),
+        await this.adapter.read("pinora.settings.recovery"),
+        raw,
+      );
+    });
+  }
+  // Mutate a validated fresh draft. Cross-tab Web Locks prevent lost read/modify/write updates.
+  update(mutator: (draft: Settings) => void): Promise<void> {
+    return this.enqueue(async () => {
+      const draft = migrateSettings(await this.adapter.read(KEY));
+      mutator(draft);
+      const next = migrateSettings(draft);
+      await this.adapter.write(KEY, next);
+      this.error = null;
+      this.apply(next);
+    });
+  }
+  // Only called after explicit confirmation; never overwrite an unknown schema without a backup.
+  resetToDefaults(): Promise<void> {
+    return this.enqueue(async () => {
+      const raw = await this.adapter.read(KEY);
+      if (raw !== undefined)
+        await this.adapter.write("pinora.settings.recovery", raw);
+      const next = structuredClone(defaults);
+      await this.adapter.write(KEY, next);
+      this.apply(next);
+    });
+  }
+  async pruneIcons(validIds: Set<string>, isCurrent = () => true) {
     const stale = Object.keys(this.value.iconMappings).filter(
       (id) => !validIds.has(id),
     );
-    if (stale.length)
+    if (!stale.length) return;
+    const cancelled = Symbol("obsolete bookmark snapshot");
+    try {
       await this.update((draft) => {
+        if (!isCurrent()) throw cancelled;
         for (const id of stale) delete draft.iconMappings[id];
       });
+    } catch (error) {
+      if (error !== cancelled) throw error;
+    }
   }
 }

@@ -27,6 +27,31 @@ describe("bookmark service with event-driven native adapter contract", () => {
     expect(service.tree.nodes.has(bookmark.id)).toBe(false);
     service.stop();
   });
+  it("removes an empty folder without authorizing recursive deletion", async () => {
+    const { service, adapter, parent } = await setup();
+    const folder = await service.create(parent, "empty");
+    const remove = vi.spyOn(adapter, "remove");
+    await service.remove(folder.id);
+    expect(remove).toHaveBeenCalledWith(folder.id, false);
+    expect(service.tree.nodes.has(folder.id)).toBe(false);
+    service.stop();
+  });
+  it("preserves concurrent native children when its cached folder is empty", async () => {
+    const { service, adapter, parent } = await setup();
+    const folder = await service.create(parent, "empty snapshot");
+    service.stop(); // Hold the last snapshot while the native tree changes.
+    const child = await adapter.create({
+      parentId: folder.id,
+      title: "new child",
+      url: "https://example.com",
+    });
+    const remove = vi.spyOn(adapter, "remove");
+    expect(service.tree.nodes.get(folder.id)?.children).toEqual([]);
+    await expect(service.remove(folder.id)).rejects.toThrow("文件夹非空");
+    expect(remove).toHaveBeenCalledWith(folder.id, false);
+    await service.refresh();
+    expect(service.tree.nodes.get(folder.id)?.children).toEqual([child.id]);
+  });
   it("preserves the final-index contract in the preview in both directions", async () => {
     const { service, parent } = await setup();
     const folder = await service.create(parent, "sort");
@@ -90,14 +115,12 @@ describe("bookmark service with event-driven native adapter contract", () => {
   });
   it("does not report a committed create as failed when only refreshing fails", async () => {
     const { service, adapter, parent } = await setup();
-    adapter.create = vi
-      .fn()
-      .mockResolvedValue({
-        id: "committed",
-        parentId: parent,
-        title: "created",
-        url: "https://example.com/",
-      });
+    adapter.create = vi.fn().mockResolvedValue({
+      id: "committed",
+      parentId: parent,
+      title: "created",
+      url: "https://example.com/",
+    });
     adapter.getTree = vi.fn().mockRejectedValue(new Error("read failed"));
     await expect(
       service.create(parent, "created", "example.com"),

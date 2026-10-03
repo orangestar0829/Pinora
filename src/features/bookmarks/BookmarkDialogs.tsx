@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Dialog } from "../../components/Dialog";
 import { canMove, type BookmarkNode } from "../../domain/tree";
 import type { Runtime } from "../../app/runtime";
@@ -14,7 +14,17 @@ export function BookmarkDialog({
   runtime: Runtime;
   onClose: () => void;
 }) {
-  const node = "node" in action ? action.node : undefined;
+  const tree = useSyncExternalStore(
+    runtime.bookmarks.subscribe,
+    () => runtime.bookmarks.tree,
+  );
+  const node =
+    "node" in action
+      ? action.kind === "delete"
+        ? tree.nodes.get(action.node.id)
+        : action.node
+      : undefined;
+  const confirmsNonEmpty = Boolean(node?.children.length);
   const [title, setTitle] = useState(node?.title ?? "");
   const [url, setUrl] = useState(node?.url ?? "");
   const [destination, setDestination] = useState("");
@@ -39,7 +49,7 @@ export function BookmarkDialog({
     setError("");
     try {
       if (action.kind === "delete")
-        await runtime.bookmarks.remove(action.node.id, true);
+        await runtime.bookmarks.remove(action.node.id, confirmsNonEmpty);
       else if (action.kind === "move")
         await runtime.bookmarks.move(action.node.id, destination);
       else if (action.kind === "edit")
@@ -69,10 +79,12 @@ export function BookmarkDialog({
           void submit();
         }}
       >
-        {deleting ? (
+        {deleting && !node ? (
+          <p role="status">该项目已被删除，请关闭此窗口。</p>
+        ) : deleting ? (
           <p>
             确定删除“{node?.title}”吗？
-            {node?.children.length ? (
+            {confirmsNonEmpty && node ? (
               <strong className="danger-copy">
                 此文件夹中的全部 {node.children.length}{" "}
                 个直接子项及其所有后代也会从浏览器书签中删除。
@@ -143,7 +155,7 @@ export function BookmarkDialog({
           </button>
           <button
             className={`button ${deleting ? "danger" : "primary"}`}
-            disabled={busy}
+            disabled={busy || (deleting && !node)}
           >
             {busy
               ? "处理中…"

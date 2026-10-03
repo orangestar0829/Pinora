@@ -18,7 +18,7 @@ export function normalizeUrl(input: string): string {
   )
     throw new Error("请输入有效的网址（不能包含空白或控制字符）。");
   const explicit =
-    /^[a-z][a-z\d+.-]*:/i.test(value) && !/^[\w.-]+:\d+(\/|$)/.test(value);
+    /^[a-z][a-z\d+.-]*:/i.test(value) && !/^[\w.-]+:\d+([/?#]|$)/.test(value);
   let url: URL;
   try {
     url = new URL(explicit ? value : `https://${value}`);

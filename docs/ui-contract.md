@@ -10,7 +10,7 @@ Import `createRuntime` from `src/domain/runtime`. Call once outside React render
 
 ## Tree
 
-`bookmarks.tree: BookmarkTree = { nodes: Map<string, BookmarkNode>, roots: string[], searchIndex }`. Node fields: `id, parentId?, title, url?, index, children: string[], folder, protected, readOnly, path: string[], hostname`. Path holds ancestor IDs, not the node itself. Use node IDs as keys. Root and its direct children and folderType nodes are protected from rename/move/delete; protected system folders may accept children. Managed/readOnly nodes and their descendants are not editable. Root cannot accept writes. Use `initialFolder(tree)` from `domain/tree` for first writable system folder or root fallback; never hardcode IDs. Breadcrumb path is `[...node.path, node.id]` mapped through nodes. If current folder disappears select initialFolder again.
+`bookmarks.tree: BookmarkTree = { nodes: Map<string, BookmarkNode>, roots: string[], searchIndex }`. Node fields: `id, parentId?, title, url?, index, children: string[], folder, protected, readOnly, path: string[], hostname`. Path holds ancestor IDs, not the node itself. Use node IDs as keys. Root and its direct children and folderType nodes are protected from rename/move/delete; protected system folders may accept children. Managed/readOnly nodes and their descendants are not editable. Root cannot accept writes. Use `resolveBookmarkFolder(tree, settings.bookmarkFolderId)` from `domain/folderScope` as the dashboard root; never hardcode IDs. Null configuration selects the initial real folder. Missing, non-folder and virtual-root configurations show an unavailable state, never the entire library. Navigation, breadcrumbs, Escape and search results must stay within this root using `isInBookmarkFolder`. If a current descendant disappears or moves outside the scope, return to the configured root. The sidebar tree and dashboard folder-creation action are removed; existing folder operations remain available.
 
 `searchTree(tree, query)` returns matching node array using the already-built index (title, URL, hostname, ancestor names). Call per query; does not traverse the raw tree. Index currently rebuilds once per bookmark event snapshot, not incrementally. Render only current folder / search results, consider result cap or windowing for large sets.
 
@@ -34,6 +34,7 @@ Import `Settings`, `defaults` from `storage/settings`. `settings.value` is valid
 
 - `schemaVersion: 1`
 - `theme: 'light'|'dark'|'system'`, `openMode: 'current'|'new'|'background'`
+- `bookmarkFolderId: string|null`: selected dashboard root, null for the default real folder; persisted and synchronized between tabs. Legacy v1 data without this field remains valid.
 - `layout.tileSize`: 96..240, default 148
 - `layout.iconSize`: 20..96, default 40
 - `layout.gapX/gapY`: 4..64, defaults 16/20
@@ -49,7 +50,9 @@ Import `Settings`, `defaults` from `storage/settings`. `settings.value` is valid
 - `background.blur`: 0..40 px; brightness 20..150 percent; overlay 0..90 percent
 - `iconMappings: Record<bookmarkId, assetId>`
 
-Invalid individual fields reset to defaults. Unknown schema version throws and original is retained; settings.start records original under pinora.settings.recovery. UI show settings.error. Reset via `settings.update(d => Object.assign(d, structuredClone(defaults)))`; if preserving user icons/background is desired reset fields independently. Runtime removes mappings when bookmarks disappear. Blob garbage collection is intentionally not automatic (avoid deleting shared/referenced assets); remove replaced assets only after checking all current references.
+Invalid individual fields reset to defaults. Unknown schema version throws and original is retained; settings.start records original under pinora.settings.recovery. UI shows settings.error and retries settings.refresh(). After explicit user confirmation, settings.resetToDefaults() backs up the current raw settings before replacing them; backup failure prevents replacement. The recovery key retains the latest backup, not a history. Refresh backups share the settings queue/lock and recheck the captured data before writing. Runtime removes mappings when bookmarks disappear and cancels queued cleanup if its bookmark snapshot becomes obsolete.
+
+Unreferenced blobs are marked first and reclaimed after a 24-hour grace period. Maintenance runs on startup, reference changes and hourly; raw current settings and recovery-copy references are protected, including unknown fields. Media commits and collection share the pinora.assets Web Lock, with fresh settings read under the pinora.settings lock. Collection is skipped where Web Locks are unavailable. settings.maintenanceError is notified independently of ordinary settings errors; runtime.retryMaintenance() retries asset collection, while refreshing bookmarks retries icon cleanup.
 
 ## Local images
 

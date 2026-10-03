@@ -85,7 +85,9 @@ export function createPreviewAdapter(): BrowserAdapter {
       emit();
       return n;
     },
-    remove: async (id) => {
+    remove: async (id, recursive) => {
+      if (find(id).children?.length && !recursive)
+        throw new Error("文件夹非空，请确认删除其中的所有书签。");
       const p = parent(id);
       p.children = p.children!.filter((n) => n.id !== id);
       emit();

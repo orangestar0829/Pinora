@@ -1,0 +1,24 @@
+{
+  "browser": "154.0.4258.48",
+  "profile": "C:\\Users\\potter\\AppData\\Local\\Temp\\pinora-remediation-1DxKrR\\.test-profiles\\acceptance-abGeS4",
+  "externalRequests": [],
+  "pageErrors": [],
+  "warmReadyObservedMs": [
+    93.10000000149012,
+    79.19999999925494,
+    85.10000000149012
+  ],
+  "nativeCRUD": true,
+  "nativeBidirectionalDrag": true,
+  "crossFolderMove": true,
+  "settingsCrossTab": true,
+  "mediaRestartPersistence": true,
+  "offline": true,
+  "viewportWidths": [
+    1280,
+    1366,
+    1920,
+    2560,
+    3840
+  ]
+}

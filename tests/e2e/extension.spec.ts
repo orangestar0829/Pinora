@@ -10,6 +10,129 @@ import path from "node:path";
 const channel =
   process.env.PINORA_TEST_CHANNEL === "msedge" ? "msedge" : "chromium";
 
+test("Deletion confirmation follows live children and rejects unconfirmed native races", async () => {
+  await mkdir(".test-profiles", { recursive: true });
+  const profile = await mkdtemp(
+    path.join(process.cwd(), ".test-profiles", "delete-regression-"),
+  );
+  const extension = path.join(process.cwd(), "dist");
+  const context = await chromium.launchPersistentContext(profile, {
+    channel,
+    headless: true,
+    args: [
+      `--disable-extensions-except=${extension}`,
+      `--load-extension=${extension}`,
+    ],
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto(
+      channel === "msedge" ? "edge://newtab/" : "chrome://newtab/",
+    );
+    await expect(page.locator(".loading-ring")).toHaveCount(0);
+    const folderId = await page.evaluate(async () => {
+      const [root] = await chrome.bookmarks.getTree();
+      const parent =
+        root.children!.find((node) => node.folderType === "bookmarks-bar") ??
+        root.children![0];
+      return (
+        await chrome.bookmarks.create({
+          parentId: parent.id,
+          title: "删除竞态检查",
+        })
+      ).id;
+    });
+    const dialog = page.getByRole("dialog");
+    const openDelete = async () => {
+      await page
+        .getByRole("button", { name: "管理 删除竞态检查", exact: true })
+        .click();
+      await page.getByRole("menuitem", { name: "删除", exact: true }).click();
+    };
+    await openDelete();
+    await expect(dialog).not.toContainText("其所有后代");
+    const childId = await page.evaluate(
+      async (parentId) =>
+        (
+          await chrome.bookmarks.create({
+            parentId,
+            title: "外部新增",
+            url: "https://example.test/",
+          })
+        ).id,
+      folderId,
+    );
+    await expect(dialog).toContainText("全部 1 个直接子项及其所有后代");
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    expect(
+      await page.evaluate(
+        async (id) => (await chrome.bookmarks.get(id))[0].id,
+        childId,
+      ),
+    ).toBe(childId);
+    await page.evaluate(async (id) => {
+      await chrome.bookmarks.remove(id);
+    }, childId);
+    await openDelete();
+    await expect(dialog).not.toContainText("其所有后代");
+    // Insert a child exactly at the native remove boundary, after UI confirmation.
+    await page.evaluate((id) => {
+      const original = chrome.bookmarks.remove.bind(chrome.bookmarks);
+      Object.assign(chrome.bookmarks, {
+        remove: async (target: string) => {
+          Object.assign(chrome.bookmarks, { remove: original });
+          await chrome.bookmarks.create({
+            parentId: id,
+            title: "删除瞬间新增",
+            url: "https://example.test/race",
+          });
+          await original(target);
+        },
+      });
+    }, folderId);
+    await dialog.getByRole("button", { name: "确认删除", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toBeVisible();
+    expect(
+      await page.evaluate(
+        async (id) =>
+          (await chrome.bookmarks.getChildren(id)).map((node) => node.title),
+        folderId,
+      ),
+    ).toEqual(["删除瞬间新增"]);
+    await expect(dialog).toContainText("其所有后代");
+    // The retry now explicitly confirms the displayed non-empty warning.
+    await dialog.getByRole("button", { name: "确认删除", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        async () =>
+          (await chrome.bookmarks.search({ title: "删除竞态检查" })).length,
+      ),
+    ).toBe(0);
+
+    const missingId = await page.evaluate(async () => {
+      const [root] = await chrome.bookmarks.getTree();
+      return (
+        await chrome.bookmarks.create({
+          parentId: root.children![0].id,
+          title: "删除竞态检查",
+        })
+      ).id;
+    });
+    await openDelete();
+    await page.evaluate(async (id) => {
+      await chrome.bookmarks.remove(id);
+    }, missingId);
+    await expect(dialog).toContainText("该项目已被删除");
+    await expect(
+      dialog.getByRole("button", { name: "确认删除", exact: true }),
+    ).toBeDisabled();
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+  } finally {
+    await context.close();
+  }
+});
+
 test("Chromium Alpha: native bookmarks, drag, local media, synchronization and restart", async () => {
   await mkdir(".test-profiles", { recursive: true });
   await mkdir("artifacts", { recursive: true });

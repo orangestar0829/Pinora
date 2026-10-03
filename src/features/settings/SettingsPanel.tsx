@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Sun,
   Moon,
@@ -66,11 +66,35 @@ export function SettingsPanel({
   runtime: Runtime;
   onClose: () => void;
 }) {
-  const { settings } = useRuntime(runtime);
+  const { settings, tree } = useRuntime(runtime);
+  const folders = [...tree.nodes.values()].filter(
+    (node) => node.folder && node.parentId !== undefined,
+  );
+  const folderPath = (id: string) => {
+    const node = tree.nodes.get(id);
+    return node
+      ? [...node.path, node.id]
+          .filter((part) => !tree.roots.includes(part))
+          .map((part) => tree.nodes.get(part)?.title)
+          .join(" / ")
+      : "所选文件夹已不可用";
+  };
   const [tab, setTab] = useState("appearance");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const uploadSequence = useRef(0);
+  useEffect(
+    () => () => {
+      uploadSequence.current += 1;
+    },
+    [],
+  );
+  const cancelUpload = () => {
+    uploadSequence.current += 1;
+    setBusy(false);
+    if (input.current) input.current.value = "";
+  };
   const update = (mutate: (draft: Settings) => void) => {
     setError("");
     void runtime.settings
@@ -79,18 +103,27 @@ export function SettingsPanel({
   };
   async function upload(file?: File) {
     if (!file) return;
+    const sequence = ++uploadSequence.current;
+    const { type, assetId } = runtime.settings.value.background;
+    const isCurrent = () => uploadSequence.current === sequence;
     setBusy(true);
     setError("");
     try {
       await saveWallpaper(
         runtime.settings,
         await prepareImage(file, "wallpaper"),
+        (draft) =>
+          isCurrent() &&
+          draft.background.type === type &&
+          draft.background.assetId === assetId,
       );
     } catch (reason) {
       setError(String(reason));
     } finally {
-      setBusy(false);
-      if (input.current) input.current.value = "";
+      if (isCurrent()) {
+        setBusy(false);
+        if (input.current) input.current.value = "";
+      }
     }
   }
   const tabs = [
@@ -100,7 +133,13 @@ export function SettingsPanel({
     { id: "privacy", label: "关于", icon: ShieldCheck },
   ];
   return (
-    <Dialog title="让这里，更像你" onClose={onClose}>
+    <Dialog
+      title="让这里，更像你"
+      onClose={() => {
+        cancelUpload();
+        onClose();
+      }}
+    >
       <div className="settings-panel">
         <p className="settings-intro">小小调整，找到舒服的浏览节奏。</p>
         <nav className="settings-tabs" aria-label="设置分类">
@@ -118,6 +157,45 @@ export function SettingsPanel({
         </nav>
         {tab === "appearance" && (
           <section className="settings-section">
+            <h3>你的书签，从这里开始</h3>
+            <label className="setting-field bookmark-folder-field">
+              <span>书签文件夹</span>
+              <select
+                aria-label="书签文件夹"
+                aria-describedby="bookmark-folder-hint"
+                value={settings.bookmarkFolderId ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value || null;
+                  update((draft) => {
+                    draft.bookmarkFolderId = value;
+                  });
+                }}
+              >
+                <option value="">默认文件夹</option>
+                {settings.bookmarkFolderId &&
+                  !folders.some(
+                    (node) => node.id === settings.bookmarkFolderId,
+                  ) && (
+                    <option value={settings.bookmarkFolderId} disabled>
+                      所选文件夹已不可用，请重新选择
+                    </option>
+                  )}
+                {folders.map((node) => (
+                  <option key={node.id} value={node.id}>
+                    {folderPath(node.id)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p
+              id="bookmark-folder-hint"
+              className="setting-hint folder-selection-hint"
+            >
+              {settings.bookmarkFolderId
+                ? `当前选择：${folderPath(settings.bookmarkFolderId)}。`
+                : "默认使用浏览器的首个可用书签文件夹。"}
+              主页和搜索仅展示此文件夹及其子文件夹中的内容。
+            </p>
             <h3>光线与心情</h3>
             <p>选择喜欢的主题，也可以跟随系统切换。</p>
             <div className="theme-options">
@@ -247,6 +325,7 @@ export function SettingsPanel({
                 value={settings.background.type}
                 onChange={(event) => {
                   const value = event.target.value;
+                  cancelUpload();
                   update((draft) => {
                     draft.background.type =
                       value as Settings["background"]["type"];
@@ -376,11 +455,12 @@ export function SettingsPanel({
             )}
             <button
               className="button reset-settings"
-              onClick={() =>
+              onClick={() => {
+                cancelUpload();
                 update((draft) => {
                   draft.background = structuredClone(defaults.background);
-                })
-              }
+                });
+              }}
             >
               <RotateCcw size={14} />
               恢复默认背景
