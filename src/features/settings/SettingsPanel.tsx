@@ -16,6 +16,7 @@ import { useRuntime, type Runtime } from "../../app/runtime";
 import { defaults, type Settings } from "../../storage/settings";
 import { prepareImage } from "../../storage/images";
 import { saveWallpaper } from "../../storage/media";
+import { version } from "../../../package.json";
 
 export function RangeControl({
   label,
@@ -82,6 +83,12 @@ export function SettingsPanel({
   const [tab, setTab] = useState("appearance");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [historyPermission, setHistoryPermission] = useState<
+    "checking" | "granted" | "denied" | "pending" | "error"
+  >("checking");
+  const [topSitesPermission, setTopSitesPermission] = useState<
+    "checking" | "granted" | "denied" | "pending" | "error"
+  >("checking");
   const input = useRef<HTMLInputElement>(null);
   const uploadSequence = useRef(0);
   useEffect(
@@ -100,6 +107,49 @@ export function SettingsPanel({
     void runtime.settings
       .update(mutate)
       .catch((reason) => setError(String(reason)));
+  };
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      runtime.adapter.hasHistoryPermission(),
+      runtime.adapter.hasTopSitesPermission(),
+    ])
+      .then(([history, topSites]) => {
+        if (!active) return;
+        setHistoryPermission(history ? "granted" : "denied");
+        setTopSitesPermission(topSites ? "granted" : "denied");
+      })
+      .catch(() => {
+        if (!active) return;
+        setHistoryPermission("error");
+        setTopSitesPermission("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [runtime]);
+  const requestPermission = async (kind: "history" | "topSites") => {
+    const setPermission =
+      kind === "history" ? setHistoryPermission : setTopSitesPermission;
+    setPermission("pending");
+    setError("");
+    try {
+      const granted =
+        kind === "history"
+          ? await runtime.adapter.requestHistoryPermission()
+          : await runtime.adapter.requestTopSitesPermission();
+      setPermission(granted ? "granted" : "denied");
+    } catch (reason) {
+      setPermission("error");
+      setError(String(reason));
+    }
+  };
+  const permissionCopy = (state: typeof historyPermission) => {
+    if (state === "checking") return "检查权限中…";
+    if (state === "pending") return "等待授权…";
+    if (state === "granted") return "已授权";
+    if (state === "error") return "检查失败";
+    return "未授权";
   };
   async function upload(file?: File) {
     if (!file) return;
@@ -249,6 +299,120 @@ export function SettingsPanel({
         )}
         {tab === "layout" && (
           <section className="settings-section">
+            <h3>主页内容</h3>
+            <p>
+              选择是否展示浏览器中的历史记录和热门网站，并设置每项占用的行数。
+            </p>
+            <div className="content-setting">
+              <div className="content-setting-main">
+                <label className="toggle-control">
+                  <span>历史记录</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.showRecentVisits}
+                    onChange={(event) => {
+                      const value = event.target.checked;
+                      update((draft) => {
+                        draft.showRecentVisits = value;
+                      });
+                    }}
+                  />
+                </label>
+                <p className="setting-hint">
+                  显示最近访问的网页，仅在本机读取。
+                </p>
+              </div>
+              <div className="content-setting-actions">
+                <span className="permission-status" role="status">
+                  {permissionCopy(historyPermission)}
+                </span>
+                {historyPermission !== "granted" && (
+                  <button
+                    className="button"
+                    type="button"
+                    disabled={
+                      historyPermission === "pending" ||
+                      historyPermission === "checking"
+                    }
+                    onClick={() => void requestPermission("history")}
+                  >
+                    {historyPermission === "pending" ? "授权中…" : "获取权限"}
+                  </button>
+                )}
+              </div>
+              <Field label="展示行数">
+                <select
+                  aria-label="历史记录展示行数"
+                  value={settings.recentVisitsRows}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    update((draft) => {
+                      draft.recentVisitsRows = value;
+                    });
+                  }}
+                >
+                  {[1, 2, 3, 4].map((rows) => (
+                    <option key={rows} value={rows}>
+                      {rows} 行
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <div className="content-setting">
+              <div className="content-setting-main">
+                <label className="toggle-control">
+                  <span>热门网站</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.showTopSites}
+                    onChange={(event) => {
+                      const value = event.target.checked;
+                      update((draft) => {
+                        draft.showTopSites = value;
+                      });
+                    }}
+                  />
+                </label>
+                <p className="setting-hint">按浏览器访问频率显示常用网站。</p>
+              </div>
+              <div className="content-setting-actions">
+                <span className="permission-status" role="status">
+                  {permissionCopy(topSitesPermission)}
+                </span>
+                {topSitesPermission !== "granted" && (
+                  <button
+                    className="button"
+                    type="button"
+                    disabled={
+                      topSitesPermission === "pending" ||
+                      topSitesPermission === "checking"
+                    }
+                    onClick={() => void requestPermission("topSites")}
+                  >
+                    {topSitesPermission === "pending" ? "授权中…" : "获取权限"}
+                  </button>
+                )}
+              </div>
+              <Field label="展示行数">
+                <select
+                  aria-label="热门网站展示行数"
+                  value={settings.topSitesRows}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    update((draft) => {
+                      draft.topSitesRows = value;
+                    });
+                  }}
+                >
+                  {[1, 2, 3, 4].map((rows) => (
+                    <option key={rows} value={rows}>
+                      {rows} 行
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
             <h3>给每个收藏，留一点空间</h3>
             <div className="range-columns">
               {(
@@ -471,24 +635,26 @@ export function SettingsPanel({
           <section className="settings-section about-panel">
             <img src="/logo.svg" width="52" height="52" alt="" />
             <h3>
-              Pinora <span>0.1 Alpha</span>
+              Pinora <span>{version}</span>
             </h3>
-            <p>以浏览器原生书签为中心，给每天的开始留一点秩序。</p>
+            <p>
+              本地优先的新标签页，以浏览器原生书签为中心，也可展示最近访问的网页和热门网站。
+            </p>
             <div className="privacy-note">
               <ShieldCheck size={23} />
               <div>
-                <strong>你的收藏，只属于你</strong>
+                <strong>数据留在本机</strong>
                 <p>
-                  无账户、无广告、无分析统计。书签直接由浏览器管理；设置、图标和壁纸仅保存在本机。
+                  无账户、无广告、无分析统计。设置、图标和壁纸保存在本机；历史记录和热门网站列表仅从本机浏览器读取，不另行保存，也不上报。
                 </p>
               </div>
             </div>
             <p>
-              本版本仅使用书签、存储和本地网站图标权限。浏览器自身启用的书签同步仍由浏览器管理。
+              基础功能使用书签、存储和本地网站图标权限。书签直接由浏览器管理，浏览器自身的书签同步仍由浏览器负责。
             </p>
             <p>
-              这是独立设计与实现的早期版本。常用网站、历史记录、下载记录及
-              Firefox 支持列入后续阶段。
+              历史记录和热门网站均为可选功能。在「布局 →
+              主页内容」中，可分别获取权限、控制是否展示，并设置展示行数。
             </p>
           </section>
         )}

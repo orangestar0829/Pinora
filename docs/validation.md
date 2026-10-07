@@ -1,20 +1,20 @@
-# 0.1 Alpha 验收记录
+# 0.0.2 验收记录
 
-日期：2026-09-25。目标代码：本工作区 `I:\code\Pinora` 的生产构建。
+日期：2026-10-07。目标代码：本工作区 `I:\code\Pinora` 的生产构建。
 
 ## 自动化证据
 
-`npm run typecheck`、`npm run lint`、`npm test` 与 `npm run build` 已通过；27 项单测覆盖 URL、系统及只读节点、路径、循环检查、索引、迁移、SVG、API 错误与刷新竞态、写成功读失败、Chromium 排序索引语义，以及删除和启动清理竞态。
+`npm run check` 已通过；当前 13 个单测文件共 72 项单测覆盖 URL、系统及只读节点、路径、循环检查、索引、迁移、SVG、API 错误与刷新竞态、写成功读失败、Chromium 排序索引语义，以及删除、启动清理、历史记录和热门网站读取竞态。
 
-`npm run test:e2e` 使用 Playwright 的 Chrome for Testing 153.0.8010.12，在新建的独立配置文件内加载真实 `dist` 扩展。记录见 `artifacts/acceptance.json`；测试源码为 `tests/e2e/extension.spec.ts`。
+`npm run test:e2e` 使用 Playwright 的 Chrome for Testing，在新建的独立配置文件内加载真实 `dist` 扩展；本轮完整 Chromium E2E 为 12 项通过。记录见 `artifacts/acceptance.json`；测试源码为 `tests/e2e/extension.spec.ts`。
 
-同一完整 E2E 流程也已在本机 Microsoft Edge 通过，记录见 `artifacts/acceptance-msedge.json`。复现时在 PowerShell 设置 `$env:PINORA_TEST_CHANNEL = 'msedge'`，执行 `npm run test:e2e` 后移除该环境变量。
+本轮 Microsoft Edge 运行布局和内容设置 E2E 共 2 项通过。复现时在 PowerShell 设置 `$env:PINORA_TEST_CHANNEL = 'msedge'`，执行指定 Playwright 用例后移除该环境变量。
 
 | 场景 | 证据 |
 | --- | --- |
 | 安装、接管新标签页、动态读取原生系统目录 | 真实扩展页面及三项权限断言 |
 | 目录导航、搜索、结果路径、快捷键 | UI 驱动断言 |
-| 添加、URL 规范化、改名、删除及取消删除 | UI 驱动并读取原生 Bookmarks API 核对 |
+| 原生新增、改名、删除及取消删除 | UI 驱动并读取原生 Bookmarks API 核对 |
 | 同目录前移／后移、拖入文件夹、菜单移回 | 原生 parentId 和 index 顺序断言 |
 | 外部新增、修改、删除自动反映到页面 | 测试调用原生 API 并观察 UI |
 | 非空文件夹删除警告 | UI 确认内容断言 |
@@ -25,7 +25,7 @@
 | 关闭并重启浏览器、刷新、断网 | 真实持久化配置文件重启与 offline 模式 |
 | 无第三方请求／无页面错误 | 页面 request、console、pageerror 监听记录为空 |
 | 1280、1366、1920、2560、3840 宽度 | 无横向溢出断言 |
-| 500 字符连续文件夹名，390、1280、1440 宽度 | 无横向溢出、标题最多两行及完整名称 title 属性断言；操作按钮仍可打开对话框；截图人工复核 |
+| 500 字符连续文件夹名，390、1000、1280、1440、2560 宽度 | 页眉书签标题与搜索框中心线差不超过 2px，标题左缘与卡片对齐，无横向溢出；截图人工复核 |
 | 超过 200 项可继续访问 | 220 个匹配书签的第二页可见性断言 |
 | 5,000 书签／500 文件夹／10 层目录 | 域模型与索引单测；不是全规模 GUI 性能结论 |
 
@@ -37,12 +37,12 @@ Chromium 同目录向后移动采用“移除前”的 index。适配器会读�
 
 本轮 review 的三项问题均已修复。删除确认订阅当前书签树，递归授权来自当前已显示的警告；空文件夹使用非递归操作，预览适配器遵守相同约束。启动会等待最新读取完成后才进入图标清理，过期读取的失败不会覆盖最新成功结果。长标题允许断行并限制两行，完整名称保留在悬停提示中。
 
-Chrome for Testing 与 Edge 各通过 3 个 E2E 用例（完整 Alpha 流程、删除竞态、长标题）。两行截断调整后又分别通过长标题专项回归；对应截图写入 `test-results`，该目录会被后续 Playwright 运行替换。
+Chromium 与 Edge 均通过扩展加载和响应式回归；当前 Chromium 全量 E2E 通过 12 个用例，包含设置中的历史记录/热门网站开关和行数、最近访问读取、删除更新与权限状态。浏览器原生可选权限弹窗仍需在目标浏览器中手动确认；无头测试使用隔离配置和必需权限副本验证实际数据读取。对应截图写入 `test-results`，该目录会被后续 Playwright 运行替换。
 
 ## 验证边界
 
 - 页面请求监听覆盖扩展页面请求，不宣称控制浏览器自身的同步、更新或操作系统流量。
 - 启动时间样本来自本机、小型合成书签库；`warmReadyObservedMs` 是导航后观察到卡片可见的时间，不代表所有设备或冷启动保证。
 - Chromium E2E 是主要运行时证据；Firefox 尚未实现，商店签名、发布与名称检查尚未进行。
-- 0.5 Beta 与 1.0 功能不属于本次 Alpha 交付。尚未实现完整多选、Top Sites、History、Downloads、备份和高级主题。
-- Alpha 在原生书签事件后重新建立快照与索引；增量索引及 Blob 垃圾回收留待后续。
+- 当前版本尚未实现完整多选、Downloads、备份和高级主题；Top Sites 与 History 仅提供本地读取、开关和行数控制。
+- 当前版本在原生书签事件后重新建立快照与索引；增量索引及 Blob 垃圾回收留待后续。

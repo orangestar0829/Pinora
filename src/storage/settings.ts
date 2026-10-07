@@ -4,6 +4,10 @@ export interface Settings {
   theme: "light" | "dark" | "system";
   openMode: OpenMode;
   bookmarkFolderId: string | null;
+  showRecentVisits: boolean;
+  recentVisitsRows: number;
+  showTopSites: boolean;
+  topSitesRows: number;
   layout: {
     tileSize: number;
     iconSize: number;
@@ -32,6 +36,10 @@ export const defaults: Settings = {
   theme: "light",
   openMode: "current",
   bookmarkFolderId: null,
+  showRecentVisits: true,
+  recentVisitsRows: 2,
+  showTopSites: false,
+  topSitesRows: 2,
   layout: {
     tileSize: 148,
     iconSize: 40,
@@ -80,6 +88,19 @@ function number(
     ? value
     : fallback;
 }
+function integer(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= min &&
+    value <= max
+    ? value
+    : fallback;
+}
 function color(value: unknown, fallback: string): string {
   return typeof value === "string" && /^#[\da-f]{6}$/i.test(value)
     ? value
@@ -113,6 +134,16 @@ export function migrateSettings(value: unknown): Settings {
       /^[a-zA-Z\d_-]{1,128}$/.test(data.bookmarkFolderId)
         ? data.bookmarkFolderId
         : null,
+    showRecentVisits:
+      typeof data.showRecentVisits === "boolean"
+        ? data.showRecentVisits
+        : d.showRecentVisits,
+    recentVisitsRows: integer(data.recentVisitsRows, 1, 4, d.recentVisitsRows),
+    showTopSites:
+      typeof data.showTopSites === "boolean"
+        ? data.showTopSites
+        : d.showTopSites,
+    topSitesRows: integer(data.topSitesRows, 1, 4, d.topSitesRows),
     layout: {
       tileSize: number(l.tileSize, 96, 240, d.layout.tileSize),
       iconSize: number(l.iconSize, 20, 96, d.layout.iconSize),

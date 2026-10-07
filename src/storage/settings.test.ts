@@ -49,6 +49,41 @@ test("migrates unversioned data idempotently and resets corrupt fields", () => {
   expect(() => migrateSettings({ schemaVersion: 99 })).toThrow();
   expect(migrateSettings(null)).toEqual(defaults);
 });
+
+test("migrates recent history and top sites display settings with bounded rows", () => {
+  expect(migrateSettings(undefined)).toMatchObject({
+    showRecentVisits: true,
+    recentVisitsRows: 2,
+    showTopSites: false,
+    topSitesRows: 2,
+  });
+  expect(
+    migrateSettings({
+      showRecentVisits: false,
+      recentVisitsRows: 4,
+      showTopSites: true,
+      topSitesRows: 1,
+    }),
+  ).toMatchObject({
+    showRecentVisits: false,
+    recentVisitsRows: 4,
+    showTopSites: true,
+    topSitesRows: 1,
+  });
+  expect(
+    migrateSettings({
+      showRecentVisits: "false",
+      recentVisitsRows: 0,
+      showTopSites: 1,
+      topSitesRows: 2.5,
+    }),
+  ).toMatchObject({
+    showRecentVisits: defaults.showRecentVisits,
+    recentVisitsRows: defaults.recentVisitsRows,
+    showTopSites: defaults.showTopSites,
+    topSitesRows: defaults.topSitesRows,
+  });
+});
 test("serializes rapid updates without dropping fields", async () => {
   localStorage.clear();
   const service = new SettingsService(createPreviewAdapter());

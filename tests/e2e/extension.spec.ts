@@ -179,9 +179,7 @@ test("Chromium Alpha: native bookmarks, drag, local media, synchronization and r
       ).title;
     });
     await expect(page.locator(".loading-ring")).toHaveCount(0);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-      `${rootTitle}.`,
-    );
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(rootTitle);
   };
   const tile = (title: string) =>
     page.locator(".bookmark-tile").filter({
@@ -203,6 +201,11 @@ test("Chromium Alpha: native bookmarks, drag, local media, synchronization and r
       expect(
         await page.evaluate(() => chrome.runtime.getManifest().permissions),
       ).toEqual(["bookmarks", "storage", "favicon"]);
+      expect(
+        await page.evaluate(
+          () => chrome.runtime.getManifest().optional_permissions,
+        ),
+      ).toEqual(["history", "topSites"]);
       const ids = await page.evaluate(async () => {
         const roots = await chrome.bookmarks.getTree();
         const bar =
@@ -262,18 +265,19 @@ test("Chromium Alpha: native bookmarks, drag, local media, synchronization and r
         rootTitle,
       );
       await page.getByRole("button", { name: "清除搜索" }).click();
-      await page
-        .locator(".breadcrumbs")
-        .getByRole("button", { name: rootTitle, exact: true })
-        .click();
+      await page.keyboard.press("Escape");
+      await expect(tile("工作空间")).toBeVisible();
     });
-    await test.step("Native create, normalize URL, rename and confirmed deletion", async () => {
-      await page.getByRole("button", { name: "添加书签", exact: true }).click();
-      await dialog().getByLabel("名称", { exact: true }).fill("测试书签");
-      await dialog()
-        .getByLabel("网址", { exact: true })
-        .fill("example.com/new");
-      await dialog().getByRole("button", { name: "保存", exact: true }).click();
+    await test.step("Native create, rename and confirmed deletion", async () => {
+      await page.evaluate(
+        async (parentId) =>
+          chrome.bookmarks.create({
+            parentId,
+            title: "测试书签",
+            url: "https://example.com/new",
+          }),
+        base,
+      );
       await expect(tile("测试书签")).toBeVisible();
       expect(
         await page.evaluate(
@@ -338,10 +342,7 @@ test("Chromium Alpha: native bookmarks, drag, local media, synchronization and r
       await page.getByRole("menuitem", { name: "移动到…" }).click();
       await dialog().getByLabel("目标文件夹").selectOption(base);
       await dialog().getByRole("button", { name: "移动", exact: true }).click();
-      await page
-        .locator(".breadcrumbs")
-        .getByRole("button", { name: rootTitle, exact: true })
-        .click();
+      await page.keyboard.press("Escape");
       await expect(tile("GitHub")).toBeVisible();
     });
     await test.step("Native external events and protected folder handling", async () => {

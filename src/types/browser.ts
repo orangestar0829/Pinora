@@ -9,8 +9,26 @@ export interface RawBookmark {
   folderType?: string;
 }
 export type OpenMode = "current" | "new" | "background";
+export interface RecentVisit {
+  id: string;
+  title: string;
+  url: string;
+  lastVisitTime: number;
+}
+export interface PopularSite {
+  title: string;
+  url: string;
+}
 export interface BrowserAdapter {
   readonly preview: boolean;
+  hasHistoryPermission(): Promise<boolean>;
+  requestHistoryPermission(): Promise<boolean>;
+  getRecentVisits(): Promise<RecentVisit[]>;
+  onHistoryChanged(listener: () => void): () => void;
+  hasTopSitesPermission(): Promise<boolean>;
+  requestTopSitesPermission(): Promise<boolean>;
+  getTopSites(): Promise<PopularSite[]>;
+  onTopSitesChanged(listener: () => void): () => void;
   getTree(): Promise<RawBookmark[]>;
   create(input: {
     parentId: string;

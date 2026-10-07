@@ -6,18 +6,7 @@ import {
   type CSSProperties,
   type MouseEvent,
 } from "react";
-import {
-  Search,
-  Settings,
-  Plus,
-  Pencil,
-  Check,
-  ChevronRight,
-  Folder,
-  ArrowUpRight,
-  Bookmark,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Search, Settings, Plus, Folder, X } from "lucide-react";
 import { getRuntime, useRuntime, type Runtime } from "./runtime";
 import { searchTree, type BookmarkNode } from "../domain/tree";
 import {
@@ -29,6 +18,8 @@ import {
   type BookmarkAction,
 } from "../features/bookmarks/BookmarkDialogs";
 import { BookmarkGrid } from "../features/bookmarks/BookmarkGrid";
+import { RecentVisits } from "../features/history/RecentVisits";
+import { TopSites } from "../features/history/TopSites";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { Background } from "../features/settings/Background";
 import { CustomIconDialog } from "../features/settings/CustomIconDialog";
@@ -61,7 +52,6 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
   const [error, setError] = useState("");
   const [folderId, setFolderId] = useState<string>();
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState(false);
   const [action, setAction] = useState<BookmarkAction>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [iconNode, setIconNode] = useState<BookmarkNode>();
@@ -199,43 +189,24 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
   } as CSSProperties;
   const writable =
     current && !current.readOnly && current.parentId !== undefined;
-  const breadcrumbs = current
-    ? [...current.path, current.id].filter((id) =>
-        isInBookmarkFolder(tree, id, rootId),
-      )
-    : [];
   return (
     <div className="shell" style={variables}>
       <Background settings={settings} />
       <div className="workspace">
         <header className="topbar">
-          <a
-            className="brand"
-            href="#"
-            aria-label="Pinora，返回所选文件夹"
-            onClick={(event) => {
-              event.preventDefault();
-              if (rootId) navigate(rootId);
-            }}
-          >
-            <img src="/logo.svg" alt="" />
-            <span>
-              Pinora<small>留住灵感，自在出发</small>
-            </span>
-          </a>
-          <div className="breadcrumbs" aria-label="当前位置">
-            <Bookmark size={16} />
-            {breadcrumbs.map((id) => (
-              <span key={id}>
-                <ChevronRight size={13} />
-                <button
-                  title={tree.nodes.get(id)?.title}
-                  onClick={() => navigate(id)}
-                >
-                  {tree.nodes.get(id)?.title}
-                </button>
-              </span>
-            ))}
+          <div className="recent-visits-heading bookmarks-heading">
+            <h2 id="bookmarks-title">书签</h2>
+            {current?.parentId && current.id !== rootId && (
+              <button
+                className="button parent-folder"
+                onClick={() => navigate(current.parentId!)}
+                aria-label="返回上级"
+                title="返回上级"
+              >
+                <ArrowLeft size={15} />
+                <span>返回上级</span>
+              </button>
+            )}
           </div>
           <div className="topbar-right">
             <label className="search">
@@ -310,108 +281,83 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
               )}
             </div>
           )}
-          <section className="collection-heading">
-            <div className="collection-summary">
-              <div className="eyebrow">YOUR LITTLE CORNER OF THE WEB</div>
-              <h1 title={searching ? undefined : current?.title}>
-                {searching ? "找到你的下一站" : current?.title || "我的书签"}
-                <span className="heading-dot">.</span>
-              </h1>
-              <p>
-                {searching
-                  ? `“${query}” 的 ${results.length} 条搜索结果`
-                  : `${results.filter((n) => !n.folder).length} 个书签 · ${results.filter((n) => n.folder).length} 个文件夹`}
-                <span className="subtitle-separator">/</span>
-                {searching ? "搜索名称、网址与路径" : "好去处，都在这里"}
-              </p>
-            </div>
-            <div className="collection-actions">
-              <button
-                className={`button ${editing ? "selected" : ""}`}
-                onClick={() => setEditing(!editing)}
-              >
-                {editing ? <Check size={16} /> : <Pencil size={15} />}
-                {editing ? "完成" : "整理"}
-              </button>
-              <button
-                className="button primary"
-                disabled={!writable}
-                onClick={() =>
-                  writable &&
-                  setAction({ kind: "create-bookmark", parentId: current.id })
-                }
-              >
-                <Plus size={17} />
-                添加书签
-              </button>
-            </div>
-          </section>
-          {!ready ? (
-            <div className="empty-state">
-              <span className="loading-ring" />
-              <h2>正在整理你的书签…</h2>
-              <p>从浏览器读取，保持原来的样子。</p>
-            </div>
-          ) : !current ? (
-            <div className="empty-state">
-              <span className="empty-icon">
-                <Folder size={32} />
-              </span>
-              <h2>书签文件夹不可用</h2>
-              <p>所选文件夹可能已被删除，请在设置中重新选择书签文件夹。</p>
-              <button
-                className="button primary"
-                onClick={() => setSettingsOpen(true)}
-              >
-                选择书签文件夹
-              </button>
-            </div>
-          ) : results.length ? (
-            <BookmarkGrid
-              key={`${rootId}:${currentId}`}
-              nodes={results.slice(
-                Math.min(
-                  page,
-                  Math.max(0, Math.ceil(results.length / 200) - 1),
-                ) * 200,
-                (Math.min(
-                  page,
-                  Math.max(0, Math.ceil(results.length / 200) - 1),
-                ) +
-                  1) *
-                  200,
-              )}
-              runtime={runtime}
-              editing={editing}
-              searching={searching}
-              onOpen={open}
-              onAction={setAction}
-              onError={setError}
-            />
-          ) : (
-            <div className="empty-state">
-              <span className="empty-icon">
-                {searching ? <Search size={32} /> : <Folder size={32} />}
-              </span>
-              <h2>{searching ? "暂时没有找到" : "为下一次灵感留个位置"}</h2>
-              <p>
-                {searching
-                  ? "试试更短的关键词，或搜索网址与文件夹名称。"
-                  : "添加一个书签，或在浏览器书签管理器中整理这个文件夹。"}
-              </p>
-              {!searching && writable && (
+          <h1 className="sr-only">
+            {searching ? "书签搜索结果" : current?.title || "我的书签"}
+          </h1>
+          <section
+            className="bookmarks-section"
+            aria-labelledby="bookmarks-title"
+          >
+            {!ready ? (
+              <div className="empty-state">
+                <span className="loading-ring" />
+                <h2>正在整理你的书签…</h2>
+                <p>从浏览器读取，保持原来的样子。</p>
+              </div>
+            ) : !current ? (
+              <div className="empty-state">
+                <span className="empty-icon">
+                  <Folder size={32} />
+                </span>
+                <h2>书签文件夹不可用</h2>
+                <p>所选文件夹可能已被删除，请在设置中重新选择书签文件夹。</p>
                 <button
                   className="button primary"
-                  onClick={() =>
-                    setAction({ kind: "create-bookmark", parentId: current.id })
-                  }
+                  onClick={() => setSettingsOpen(true)}
                 >
-                  <Plus size={17} />
-                  添加第一个书签
+                  选择书签文件夹
                 </button>
-              )}
-            </div>
-          )}
+              </div>
+            ) : results.length ? (
+              <BookmarkGrid
+                key={`${rootId}:${currentId}`}
+                nodes={results.slice(
+                  Math.min(
+                    page,
+                    Math.max(0, Math.ceil(results.length / 200) - 1),
+                  ) * 200,
+                  (Math.min(
+                    page,
+                    Math.max(0, Math.ceil(results.length / 200) - 1),
+                  ) +
+                    1) *
+                    200,
+                )}
+                runtime={runtime}
+                editing={false}
+                searching={searching}
+                onOpen={open}
+                onAction={setAction}
+                onError={setError}
+              />
+            ) : (
+              <div className="empty-state">
+                <span className="empty-icon">
+                  {searching ? <Search size={32} /> : <Folder size={32} />}
+                </span>
+                <h2>{searching ? "暂时没有找到" : "为下一次灵感留个位置"}</h2>
+                <p>
+                  {searching
+                    ? "试试更短的关键词，或搜索网址与文件夹名称。"
+                    : "添加一个书签，或在浏览器书签管理器中整理这个文件夹。"}
+                </p>
+                {!searching && writable && (
+                  <button
+                    className="button primary"
+                    onClick={() =>
+                      setAction({
+                        kind: "create-bookmark",
+                        parentId: current.id,
+                      })
+                    }
+                  >
+                    <Plus size={17} />
+                    添加第一个书签
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
           {results.length > 200 && (
             <nav className="pagination" aria-label="书签分页">
               <button
@@ -434,12 +380,19 @@ function Dashboard({ runtime }: { runtime: Runtime }) {
               </button>
             </nav>
           )}
-          <footer className="canvas-footer">
-            <span>一点秩序，更多可能。</span>
-            <span>
-              从这里，去往你喜欢的地方 <ArrowUpRight size={14} />
-            </span>
-          </footer>
+          {ready && current && currentId === rootId && !searching && (
+            <>
+              {settings.showRecentVisits && (
+                <RecentVisits
+                  runtime={runtime}
+                  rows={settings.recentVisitsRows}
+                />
+              )}
+              {settings.showTopSites && (
+                <TopSites runtime={runtime} rows={settings.topSitesRows} />
+              )}
+            </>
+          )}
         </main>
       </div>
       {recoveryOpen && (

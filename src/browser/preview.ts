@@ -68,6 +68,14 @@ export function createPreviewAdapter(): BrowserAdapter {
   const emit = () => listeners.forEach((l) => l());
   return {
     preview: true,
+    hasHistoryPermission: async () => false,
+    requestHistoryPermission: async () => false,
+    getRecentVisits: async () => [],
+    onHistoryChanged: () => () => {},
+    hasTopSitesPermission: async () => false,
+    requestTopSitesPermission: async () => false,
+    getTopSites: async () => [],
+    onTopSitesChanged: () => () => {},
     getTree: async () => structuredClone(tree),
     create: async (input) => {
       const n = {

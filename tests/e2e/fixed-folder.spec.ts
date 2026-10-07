@@ -81,17 +81,15 @@ test("fixed folder confines navigation and search, synchronizes and fails closed
       .getByRole("combobox", { name: "书签文件夹", exact: true })
       .selectOption(ids.selected);
     await expect(second.getByRole("heading", { level: 1 })).toHaveText(
-      "固定收藏.",
+      "固定收藏",
     );
     await close();
-    await expect(heading).toHaveText("固定收藏.");
+    await expect(heading).toHaveText("固定收藏");
     await expect(page.locator(".bookmark-tile")).toHaveCount(2);
     await expect(page.locator(".sidebar")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "新建文件夹", exact: true }),
     ).toHaveCount(0);
-    await expect(page.locator(".breadcrumbs button")).toHaveText(["固定收藏"]);
-
     await page
       .getByRole("textbox", { name: "搜索书签与文件夹" })
       .fill("共同关键词");
@@ -100,17 +98,17 @@ test("fixed folder confines navigation and search, synchronizes and fails closed
     await expect(tile("子目录共同关键词")).toBeVisible();
     await page.keyboard.press("Escape");
     await tile("子目录").locator(".tile-main").click();
-    await expect(heading).toHaveText("子目录.");
-    await expect(page.locator(".breadcrumbs button")).toHaveText([
-      "固定收藏",
-      "子目录",
-    ]);
+    await expect(heading).toHaveText("子目录");
     await page.keyboard.press("Escape");
-    await expect(heading).toHaveText("固定收藏.");
+    await expect(heading).toHaveText("固定收藏");
+    await tile("子目录").locator(".tile-main").click();
+    await expect(heading).toHaveText("子目录");
     await page.keyboard.press("Escape");
-    await expect(heading).toHaveText("固定收藏.");
+    await expect(heading).toHaveText("固定收藏");
+    await page.keyboard.press("Escape");
+    await expect(heading).toHaveText("固定收藏");
     await page.reload();
-    await expect(heading).toHaveText("固定收藏.");
+    await expect(heading).toHaveText("固定收藏");
 
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
@@ -144,11 +142,11 @@ test("fixed folder confines navigation and search, synchronizes and fails closed
       .getByRole("combobox", { name: "书签文件夹", exact: true })
       .selectOption(ids.other);
     await close();
-    await expect(heading).toHaveText("其他收藏.");
+    await expect(heading).toHaveText("其他收藏");
     await expect(tile("外部共同关键词")).toBeVisible();
     await expect(tile("范围内共同关键词")).toHaveCount(0);
     await expect(second.getByRole("heading", { level: 1 })).toHaveText(
-      "其他收藏.",
+      "其他收藏",
     );
     await page.evaluate(async (id) => {
       await chrome.bookmarks.removeTree(id);
@@ -160,9 +158,6 @@ test("fixed folder confines navigation and search, synchronizes and fails closed
       second.getByRole("heading", { name: "书签文件夹不可用" }),
     ).toBeVisible();
     await expect(page.locator(".bookmark-tile")).toHaveCount(0);
-    await expect(
-      page.getByRole("button", { name: "添加书签", exact: true }),
-    ).toBeDisabled();
     await page.reload();
     await expect(
       page.getByRole("heading", { name: "书签文件夹不可用" }),
@@ -177,7 +172,7 @@ test("fixed folder confines navigation and search, synchronizes and fails closed
       .getByRole("combobox", { name: "书签文件夹", exact: true })
       .selectOption(ids.selected);
     await close();
-    await expect(heading).toHaveText("固定收藏.");
+    await expect(heading).toHaveText("固定收藏");
     expect(errors).toEqual([]);
   } finally {
     await context.close();

@@ -1,6 +1,6 @@
-# Pinora 0.1 Alpha UI contract
+# Pinora 0.0.2 UI contract
 
-The Alpha UI is implemented in `src/app/**`, `src/components/**`, `src/features/**` and `src/styles/**`. All browser calls MUST remain under `src/browser/**`. Synthetic fixtures are restricted to explicit preview mode and isolated test profiles. No real user bookmark fixtures are seeded. No optional permissions or remote requests.
+The UI is implemented in `src/app/**`, `src/components/**`, `src/features/**` and `src/styles/**`. All browser calls MUST remain under `src/browser/**`. Synthetic fixtures are restricted to explicit preview mode and isolated test profiles. No real user bookmark fixtures are seeded. Optional `history` and `topSites` permissions are requested through explicit clicks in Settings → Layout → Home content. No remote requests.
 
 ## Lifecycle and reactivity
 
@@ -10,7 +10,7 @@ Import `createRuntime` from `src/domain/runtime`. Call once outside React render
 
 ## Tree
 
-`bookmarks.tree: BookmarkTree = { nodes: Map<string, BookmarkNode>, roots: string[], searchIndex }`. Node fields: `id, parentId?, title, url?, index, children: string[], folder, protected, readOnly, path: string[], hostname`. Path holds ancestor IDs, not the node itself. Use node IDs as keys. Root and its direct children and folderType nodes are protected from rename/move/delete; protected system folders may accept children. Managed/readOnly nodes and their descendants are not editable. Root cannot accept writes. Use `resolveBookmarkFolder(tree, settings.bookmarkFolderId)` from `domain/folderScope` as the dashboard root; never hardcode IDs. Null configuration selects the initial real folder. Missing, non-folder and virtual-root configurations show an unavailable state, never the entire library. Navigation, breadcrumbs, Escape and search results must stay within this root using `isInBookmarkFolder`. If a current descendant disappears or moves outside the scope, return to the configured root. The sidebar tree and dashboard folder-creation action are removed; existing folder operations remain available.
+`bookmarks.tree: BookmarkTree = { nodes: Map<string, BookmarkNode>, roots: string[], searchIndex }`. Node fields: `id, parentId?, title, url?, index, children: string[], folder, protected, readOnly, path: string[], hostname`. Path holds ancestor IDs, not the node itself. Use node IDs as keys. Root and its direct children and folderType nodes are protected from rename/move/delete; protected system folders may accept children. Managed/readOnly nodes and their descendants are not editable. Root cannot accept writes. Use `resolveBookmarkFolder(tree, settings.bookmarkFolderId)` from `domain/folderScope` as the dashboard root; never hardcode IDs. Null configuration selects the initial real folder. Missing, non-folder and virtual-root configurations show an unavailable state, never the entire library. Navigation, the parent-folder button, Escape and search results must stay within this root using `isInBookmarkFolder`. The compact dashboard places the bookmark heading, search and settings controls in one row, with cards immediately below. It omits the brand/logo, header divider, bookmark count, organize/add toolbar and section subtitles. A screen-reader heading retains the current folder name; descendant folders retain a parent-navigation button. Recent visits and top sites sit below the root grid with section dividers when enabled and not searching. These sections use browser data independently of the selected bookmark folder and are never bookmark editing or drag targets. Use the browser's native interface to add bookmarks to populated folders; writable empty folders retain the first-bookmark action. If a current descendant disappears or moves outside the scope, return to the configured root. The sidebar tree and dashboard folder-creation action are removed; existing folder operations remain available.
 
 `searchTree(tree, query)` returns matching node array using the already-built index (title, URL, hostname, ancestor names). Call per query; does not traverse the raw tree. Index currently rebuilds once per bookmark event snapshot, not incrementally. Render only current folder / search results, consider result cap or windowing for large sets.
 
@@ -28,6 +28,10 @@ All writes await API completion and a refresh attempt; do not optimistically dis
 
 `adapter.open(url, mode)` with `'current' | 'new' | 'background'`. UI must preserve middle-click/Ctrl/Cmd/Shift conventions; use background for Ctrl/Cmd or middle, new for Shift. `adapter.favicon(url, size=64)` returns extension-local URL, undefined in preview. Use local fallback if load fails. Custom icon first, favicon next, locally generated initials last. `normalizeUrl` from domain/url rejects active schemes and normalizes bare hosts while preserving explicitly allowed schemes.
 
+## Recent visits
+
+`adapter.hasHistoryPermission()` and `adapter.hasTopSitesPermission()` check the optional grants; the corresponding request methods must be invoked directly within a settings button click. Without permission, never read the source data and show the settings path. `getRecentVisits()` queries at most 100 browser history entries with an explicit `startTime: 0`, filters valid visited HTTP(S) pages, orders by `lastVisitTime` descending, deduplicates URL and returns at most 28 entries. `getTopSites()` reads the browser's local top-sites list, filters HTTP(S), deduplicates URL and returns at most 28 entries. Settings control whether each section is shown and its 1–4 visible rows. `onHistoryChanged(listener)` observes visits, deletions and grant changes; `onTopSitesChanged(listener)` observes top-sites permission changes; dispose both on unmount and refresh on focus/visibility. Clear entries during refresh/revocation and discard stale async responses. Recheck permission before displaying history results. History and top-sites data are held only in component memory. Preview shows installation hints instead of synthetic data. Cards reuse layout/open-mode settings and local favicons but do not expose bookmark actions.
+
 ## Settings (stable v1)
 
 Import `Settings`, `defaults` from `storage/settings`. `settings.value` is validated; `settings.update(draft => { draft.theme = 'dark'; })` is Promise<void>. Do NOT pass captured full snapshots: mutate fresh draft fields only. Page queue + Web Locks serialize read/modify/write across new tabs where supported. storage.onChanged propagates to all tabs. Default theme light; themes light/dark/system. Resolve system preference live in UI. A synchronous localStorage theme hint is applied by startup.ts before app render; authoritative values remain extension local storage.
@@ -35,6 +39,8 @@ Import `Settings`, `defaults` from `storage/settings`. `settings.value` is valid
 - `schemaVersion: 1`
 - `theme: 'light'|'dark'|'system'`, `openMode: 'current'|'new'|'background'`
 - `bookmarkFolderId: string|null`: selected dashboard root, null for the default real folder; persisted and synchronized between tabs. Legacy v1 data without this field remains valid.
+- `showRecentVisits` / `showTopSites`: boolean visibility switches for the two home sections; defaults `true` / `false`.
+- `recentVisitsRows` / `topSitesRows`: integer 1..4 controlling each section's visible rows; default `2`.
 - `layout.tileSize`: 96..240, default 148
 - `layout.iconSize`: 20..96, default 40
 - `layout.gapX/gapY`: 4..64, defaults 16/20
@@ -62,4 +68,4 @@ Unreferenced blobs are marked first and reclaimed after a 24-hour grace period. 
 
 ## Remaining verification
 
-See validation.md for current Alpha evidence. Real Chromium and Edge extension loading, native CRUD/event sync, both reorder directions, media persistence, offline loading and zero external page-request assertions have passed. Original PNG manifest icons are included. No extension service worker is needed for new-tab-only Alpha.
+See validation.md for verification evidence and remaining boundaries. Original PNG manifest icons are included. No extension service worker is needed for this new-tab-only extension.

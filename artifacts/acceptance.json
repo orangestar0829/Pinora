@@ -1,12 +1,12 @@
 {
   "browser": "153.0.8010.12",
-  "profile": "I:\\code\\Pinora\\.test-profiles\\acceptance-kzCDG4",
+  "profile": "I:\\code\\Pinora\\.test-profiles\\acceptance-5iLgQU",
   "externalRequests": [],
   "pageErrors": [],
   "warmReadyObservedMs": [
-    80.20000000298023,
-    75.09999999776483,
-    76.39999999850988
+    85.80000001192093,
+    79.10000002384186,
+    81
   ],
   "nativeCRUD": true,
   "nativeBidirectionalDrag": true,
