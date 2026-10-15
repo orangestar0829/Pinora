@@ -3,12 +3,12 @@ import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type MouseEvent,
 } from "react";
 import type { Runtime } from "../../app/runtime";
 import type { PopularSite } from "../../types/browser";
 import { hostname, safeHref } from "../../domain/url";
+import { useGridColumns } from "./useGridColumns";
 
 type Status = "loading" | "permission" | "ready" | "error";
 
@@ -27,6 +27,7 @@ export function TopSites({
   const alive = useRef(false);
   const revision = useRef(0);
   const maxRows = Math.max(1, Math.min(4, rows));
+  const { gridRef, columns } = useGridColumns(runtime.settings.value.layout);
 
   const refresh = useCallback(async () => {
     const current = ++revision.current;
@@ -123,10 +124,10 @@ export function TopSites({
         </div>
       ) : entries.length ? (
         <div
+          ref={gridRef}
           className={`bookmark-grid history-grid labels-${runtime.settings.value.layout.labels}`}
-          style={{ "--history-rows": maxRows } as CSSProperties}
         >
-          {entries.slice(0, maxRows * 7).map((site) => (
+          {entries.slice(0, maxRows * columns).map((site) => (
             <div className="bookmark-tile" key={site.url}>
               <a
                 className="tile-main"

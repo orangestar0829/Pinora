@@ -89,6 +89,9 @@ export function SettingsPanel({
   const [topSitesPermission, setTopSitesPermission] = useState<
     "checking" | "granted" | "denied" | "pending" | "error"
   >("checking");
+  const requestPermission = useRef<
+    ((kind: "history" | "topSites") => void) | null
+  >(null);
   const input = useRef<HTMLInputElement>(null);
   const uploadSequence = useRef(0);
   useEffect(
@@ -110,40 +113,78 @@ export function SettingsPanel({
   };
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      runtime.adapter.hasHistoryPermission(),
-      runtime.adapter.hasTopSitesPermission(),
-    ])
-      .then(([history, topSites]) => {
+    const queries = {
+      history: { sequence: 0, pending: false },
+      topSites: { sequence: 0, pending: false },
+    };
+    const refresh = async (kind: "history" | "topSites") => {
+      const query = queries[kind];
+      if (!active || query.pending) return;
+      const sequence = ++query.sequence;
+      const setPermission =
+        kind === "history" ? setHistoryPermission : setTopSitesPermission;
+      try {
+        const granted =
+          kind === "history"
+            ? await runtime.adapter.hasHistoryPermission()
+            : await runtime.adapter.hasTopSitesPermission();
+        if (active && query.sequence === sequence && !query.pending)
+          setPermission(granted ? "granted" : "denied");
+      } catch {
+        if (active && query.sequence === sequence && !query.pending)
+          setPermission("error");
+      }
+    };
+    requestPermission.current = (kind) => {
+      const query = queries[kind];
+      if (!active || query.pending) return;
+      query.pending = true;
+      query.sequence += 1;
+      const setPermission =
+        kind === "history" ? setHistoryPermission : setTopSitesPermission;
+      setPermission("pending");
+      setError("");
+      const failed = (reason: unknown) => {
         if (!active) return;
-        setHistoryPermission(history ? "granted" : "denied");
-        setTopSitesPermission(topSites ? "granted" : "denied");
-      })
-      .catch(() => {
-        if (!active) return;
-        setHistoryPermission("error");
-        setTopSitesPermission("error");
-      });
+        query.pending = false;
+        setPermission("error");
+        setError(String(reason));
+      };
+      try {
+        // Keep the native request on the synchronous user-gesture stack.
+        const request =
+          kind === "history"
+            ? runtime.adapter.requestHistoryPermission()
+            : runtime.adapter.requestTopSitesPermission();
+        void request.then(() => {
+          if (!active) return;
+          query.pending = false;
+          // Events during the prompt are folded into this authoritative check.
+          void refresh(kind);
+        }, failed);
+      } catch (reason) {
+        failed(reason);
+      }
+    };
+    const refreshHistory = () => void refresh("history");
+    const refreshTopSites = () => void refresh("topSites");
+    const refreshAll = () => {
+      refreshHistory();
+      refreshTopSites();
+    };
+    const unsubscribeHistory = runtime.adapter.onHistoryChanged(refreshHistory);
+    const unsubscribeTopSites =
+      runtime.adapter.onTopSitesChanged(refreshTopSites);
+    window.addEventListener("focus", refreshAll);
+    refreshAll();
     return () => {
       active = false;
+      requestPermission.current = null;
+      unsubscribeHistory();
+      unsubscribeTopSites();
+      window.removeEventListener("focus", refreshAll);
     };
   }, [runtime]);
-  const requestPermission = async (kind: "history" | "topSites") => {
-    const setPermission =
-      kind === "history" ? setHistoryPermission : setTopSitesPermission;
-    setPermission("pending");
-    setError("");
-    try {
-      const granted =
-        kind === "history"
-          ? await runtime.adapter.requestHistoryPermission()
-          : await runtime.adapter.requestTopSitesPermission();
-      setPermission(granted ? "granted" : "denied");
-    } catch (reason) {
-      setPermission("error");
-      setError(String(reason));
-    }
-  };
   const permissionCopy = (state: typeof historyPermission) => {
     if (state === "checking") return "检查权限中…";
     if (state === "pending") return "等待授权…";
@@ -334,7 +375,7 @@ export function SettingsPanel({
                       historyPermission === "pending" ||
                       historyPermission === "checking"
                     }
-                    onClick={() => void requestPermission("history")}
+                    onClick={() => requestPermission.current?.("history")}
                   >
                     {historyPermission === "pending" ? "授权中…" : "获取权限"}
                   </button>
@@ -388,7 +429,7 @@ export function SettingsPanel({
                       topSitesPermission === "pending" ||
                       topSitesPermission === "checking"
                     }
-                    onClick={() => void requestPermission("topSites")}
+                    onClick={() => requestPermission.current?.("topSites")}
                   >
                     {topSitesPermission === "pending" ? "授权中…" : "获取权限"}
                   </button>

@@ -57,16 +57,17 @@ test("wallpaper cancellation preserves newer background choices and normal uploa
     );
     await page.getByRole("button", { name: "外观与设置", exact: true }).click();
     await page.getByRole("button", { name: "背景", exact: true }).click();
+    // A fresh profile has no settings until the first async write completes.
     const readBackground = () =>
       page.evaluate(
         async () =>
           (await chrome.storage.local.get("pinora.settings"))["pinora.settings"]
-            .background,
+            ?.background,
       );
     const startUpload = async () => {
       await page.getByLabel("背景类型").selectOption("image");
       await expect
-        .poll(async () => (await readBackground()).type)
+        .poll(async () => (await readBackground())?.type)
         .toBe("image");
       await pauseEncoding(page);
       await page.getByLabel("上传壁纸").setInputFiles(wallpaper);
@@ -93,7 +94,7 @@ test("wallpaper cancellation preserves newer background choices and normal uploa
     await page
       .getByRole("button", { name: "恢复默认背景", exact: true })
       .click();
-    await expect.poll(async () => (await readBackground()).type).toBe("solid");
+    await expect.poll(async () => (await readBackground())?.type).toBe("solid");
     await finishUpload();
     expect(await readBackground()).toMatchObject({
       type: "solid",
@@ -103,7 +104,7 @@ test("wallpaper cancellation preserves newer background choices and normal uploa
     await startUpload();
     await page.getByLabel("背景类型").selectOption("gradient");
     await expect
-      .poll(async () => (await readBackground()).type)
+      .poll(async () => (await readBackground())?.type)
       .toBe("gradient");
     await finishUpload();
     expect(await readBackground()).toMatchObject({
@@ -129,7 +130,7 @@ test("wallpaper cancellation preserves newer background choices and normal uploa
       .click();
     await second.getByRole("button", { name: "背景", exact: true }).click();
     await second.getByLabel("背景类型").selectOption("solid");
-    await expect.poll(async () => (await readBackground()).type).toBe("solid");
+    await expect.poll(async () => (await readBackground())?.type).toBe("solid");
     await finishUpload();
     expect(await readBackground()).toMatchObject({
       type: "solid",

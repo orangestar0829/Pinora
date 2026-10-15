@@ -350,12 +350,6 @@ h1 {
   padding-bottom: 32px;
   border-top: 1px solid var(--border);
 }
-.history-grid {
-  max-height: calc(
-    (var(--tile-size) * 1.05 + var(--gap-y)) * var(--history-rows)
-  );
-  overflow: hidden;
-}
 .recent-visits-heading {
   display: flex;
   align-items: baseline;

@@ -4,11 +4,11 @@ import {
   useRef,
   useState,
   type MouseEvent,
-  type CSSProperties,
 } from "react";
 import type { Runtime } from "../../app/runtime";
 import type { RecentVisit } from "../../types/browser";
 import { hostname, safeHref } from "../../domain/url";
+import { useGridColumns } from "./useGridColumns";
 
 type Status = "loading" | "permission" | "denied" | "ready" | "error";
 
@@ -27,6 +27,8 @@ export function RecentVisits({
   const alive = useRef(false);
   const revision = useRef(0);
   const denied = useRef(false);
+  const { gridRef, columns } = useGridColumns(runtime.settings.value.layout);
+  const maxRows = Math.max(1, Math.min(4, rows));
 
   const refresh = useCallback(async () => {
     const current = ++revision.current;
@@ -141,14 +143,10 @@ export function RecentVisits({
         </div>
       ) : entries.length ? (
         <div
+          ref={gridRef}
           className={`bookmark-grid history-grid labels-${runtime.settings.value.layout.labels}`}
-          style={
-            {
-              "--history-rows": Math.max(1, Math.min(4, rows)),
-            } as CSSProperties
-          }
         >
-          {entries.slice(0, Math.max(1, Math.min(4, rows)) * 7).map((visit) => (
+          {entries.slice(0, maxRows * columns).map((visit) => (
             <div className="bookmark-tile" key={visit.id}>
               <a
                 className="tile-main"
