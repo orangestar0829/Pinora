@@ -94,7 +94,10 @@ export class BookmarkService {
     const node = this.editable(id);
     await this.adapter.update(id, {
       title: title.trim() || "未命名",
-      ...(node.folder ? {} : { url: normalizeUrl(url ?? node.url!) }),
+      // Re-validate only a changed URL so existing bookmarklets stay renamable.
+      ...(node.folder || url === undefined || url.trim() === node.url
+        ? {}
+        : { url: normalizeUrl(url) }),
     });
     await this.syncAfterWrite();
   }

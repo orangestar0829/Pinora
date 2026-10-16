@@ -76,6 +76,26 @@ describe("bookmark service with event-driven native adapter contract", () => {
     ).rejects.toThrow("不安全");
     service.stop();
   });
+  it("renames an existing bookmarklet but rejects a changed executable URL", async () => {
+    const { adapter, service, parent } = await setup();
+    const bookmarklet = "javascript:void(0)";
+    const node = await adapter.create({
+      parentId: parent,
+      title: "小书签",
+      url: bookmarklet,
+    });
+    await service.refresh();
+    await service.update(node.id, "已改名", bookmarklet);
+    expect(service.tree.nodes.get(node.id)).toMatchObject({
+      title: "已改名",
+      url: bookmarklet,
+    });
+    await expect(
+      service.update(node.id, "已改名", "javascript:alert(1)"),
+    ).rejects.toThrow("不安全");
+    expect(service.tree.nodes.get(node.id)?.url).toBe(bookmarklet);
+    service.stop();
+  });
   it("reflects external bookmark events without polling", async () => {
     const { service, adapter, parent } = await setup();
     const item = await adapter.create({
