@@ -17,12 +17,12 @@ Ctrl / Cmd + F 搜索；方向键移动卡片焦点；Enter 打开；F2 编辑�
 
 ## 安装到 Chrome / Edge
 
-1. 解压 `artifacts/Pinora-0.0.2.zip`，或按下方步骤构建 `dist`。
+1. 从 GitHub 仓库的 Releases 页面下载最新的 `Pinora-<版本>.zip`，解压到一个固定目录。
 2. 打开 `chrome://extensions` 或 `edge://extensions`，开启“开发者模式”。
-3. 选择“加载已解压的扩展”，加载解压后的目录或项目的 `dist` 文件夹。
+3. 选择“加载已解压的扩展”，选中解压后的目录。
 4. 新建标签页，在设置中选择要展示的书签文件夹。
 
-更新本地版本后，在扩展管理页重新加载扩展，再刷新已打开的新标签页。
+升级时下载新版本覆盖解压目录，在扩展管理页点击“重新加载”，再刷新已打开的新标签页。
 
 ## 数据与权限
 
@@ -41,16 +41,27 @@ npm ci
 npm run check
 npx playwright install chromium
 npm run test:e2e
-npm run package:extension
 ```
 
-`npm run check` 执行类型检查、Lint、单元测试和生产构建。E2E 使用已构建的 `dist` 和独立测试配置文件；修改源码后先构建。打包命令需要 PowerShell，生成 `artifacts/Pinora-0.0.2.zip`。验证结果和限制见[验证记录](docs/validation.md)。
+`npm run check` 执行类型检查、Lint、单元测试和生产构建，输出到 `dist`。E2E 使用已构建的 `dist` 和独立测试配置文件；修改源码后先构建。验证结果和限制见[验证记录](docs/validation.md)。
+
+### 本地调试
+
+本地开发无需打包：在扩展管理页开启“开发者模式”，通过“加载已解压的扩展”选择项目的 `dist` 目录。修改源码后执行 `npm run build`，再在扩展管理页点击“重新加载”并刷新新标签页。
 
 ```powershell
 npm run dev
 ```
 
 打开[开发预览](http://127.0.0.1:5173/?preview=1)。预览使用明确标识的合成书签，刷新后重置，不代表浏览器原生 API 验收。
+
+### 发布
+
+```powershell
+npm run package:extension
+```
+
+打包命令需要 PowerShell，会先构建，再生成 `artifacts/Pinora-<版本>.zip`（不纳入版本控制）。发布时将该压缩包上传到 GitHub Release，供用户下载安装。
 
 ## 项目资料
 
