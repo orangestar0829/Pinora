@@ -563,7 +563,7 @@ test("Chromium Alpha: native bookmarks, drag, local media, synchronization and r
         JSON.stringify(
           {
             browser: context.browser()?.version(),
-            profile,
+            profile: path.relative(process.cwd(), profile),
             externalRequests: external,
             pageErrors: errors,
             warmReadyObservedMs: timings,
