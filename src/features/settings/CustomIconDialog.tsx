@@ -5,7 +5,7 @@ import type { Runtime } from "../../app/runtime";
 import type { BookmarkNode } from "../../domain/tree";
 import { prepareImage, sanitizeSvg } from "../../storage/images";
 import { saveCustomIcon } from "../../storage/media";
-import { RangeControl } from "./SettingsPanel";
+import { RangeControl } from "./controls";
 export function CustomIconDialog({
   runtime,
   node,
