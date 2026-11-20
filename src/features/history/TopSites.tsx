@@ -29,29 +29,37 @@ export function TopSites({
   const maxRows = Math.max(1, Math.min(4, rows));
   const { gridRef, columns } = useGridColumns(runtime.settings.value.layout);
 
-  const refresh = useCallback(async () => {
-    const current = ++revision.current;
-    const active = () => alive.current && revision.current === current;
-    setEntries([]);
-    setStatus("loading");
-    setReadError("");
-    try {
-      const granted = await adapter.hasTopSitesPermission();
-      if (!active()) return;
-      if (!granted) {
-        setStatus("permission");
-        return;
+  const refresh = useCallback(
+    async (keepVisible = false) => {
+      const current = ++revision.current;
+      const active = () => alive.current && revision.current === current;
+      // Do not replace a link while the first click is returning page focus.
+      if (!keepVisible) {
+        setEntries([]);
+        setStatus("loading");
       }
-      const sites = await adapter.getTopSites();
-      if (!active()) return;
-      setEntries(sites);
-      setStatus("ready");
-    } catch (reason) {
-      if (!active()) return;
-      setReadError(reason instanceof Error ? reason.message : String(reason));
-      setStatus("error");
-    }
-  }, [adapter]);
+      setReadError("");
+      try {
+        const granted = await adapter.hasTopSitesPermission();
+        if (!active()) return;
+        if (!granted) {
+          setEntries([]);
+          setStatus("permission");
+          return;
+        }
+        const sites = await adapter.getTopSites();
+        if (!active()) return;
+        setEntries(sites);
+        setStatus("ready");
+      } catch (reason) {
+        if (!active()) return;
+        setEntries([]);
+        setReadError(reason instanceof Error ? reason.message : String(reason));
+        setStatus("error");
+      }
+    },
+    [adapter],
+  );
 
   useEffect(() => {
     alive.current = true;
@@ -62,16 +70,20 @@ export function TopSites({
       };
     }
     const reload = () => void refresh();
+    const refocus = () => void refresh(true);
+    const visible = () => {
+      if (document.visibilityState === "visible") refocus();
+    };
     const unsubscribe = adapter.onTopSitesChanged(reload);
-    window.addEventListener("focus", reload);
-    document.addEventListener("visibilitychange", reload);
+    window.addEventListener("focus", refocus);
+    document.addEventListener("visibilitychange", visible);
     reload();
     return () => {
       alive.current = false;
       revision.current++;
       unsubscribe();
-      window.removeEventListener("focus", reload);
-      document.removeEventListener("visibilitychange", reload);
+      window.removeEventListener("focus", refocus);
+      document.removeEventListener("visibilitychange", visible);
     };
   }, [adapter, refresh]);
 

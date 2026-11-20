@@ -30,39 +30,50 @@ export function RecentVisits({
   const { gridRef, columns } = useGridColumns(runtime.settings.value.layout);
   const maxRows = Math.max(1, Math.min(4, rows));
 
-  const refresh = useCallback(async () => {
-    const current = ++revision.current;
-    const active = () => alive.current && revision.current === current;
-    setEntries([]);
-    setStatus("loading");
-    setReadError("");
-    try {
-      const granted = await adapter.hasHistoryPermission();
-      if (!active()) return;
-      if (!granted) {
-        setStatus(denied.current ? "denied" : "permission");
-        return;
-      }
-      const visits = await adapter.getRecentVisits();
-      if (!active()) return;
-      // Recheck after the read so a revoked grant never publishes old results.
-      const stillGranted = await adapter.hasHistoryPermission();
-      if (!active()) return;
-      if (!stillGranted) {
-        setStatus("permission");
-        return;
-      }
-      denied.current = false;
-      setEntries(visits);
-      setStatus("ready");
-    } catch (reason) {
-      if (active()) {
+  const refresh = useCallback(
+    async (keepVisible = false) => {
+      const current = ++revision.current;
+      const active = () => alive.current && revision.current === current;
+      // Returning from the address bar can happen between pointer down and click.
+      // Keep the current links mounted during this refresh so the click survives.
+      if (!keepVisible) {
         setEntries([]);
-        setReadError(reason instanceof Error ? reason.message : String(reason));
-        setStatus("error");
+        setStatus("loading");
       }
-    }
-  }, [adapter]);
+      setReadError("");
+      try {
+        const granted = await adapter.hasHistoryPermission();
+        if (!active()) return;
+        if (!granted) {
+          setEntries([]);
+          setStatus(denied.current ? "denied" : "permission");
+          return;
+        }
+        const visits = await adapter.getRecentVisits();
+        if (!active()) return;
+        // Recheck after the read so a revoked grant never publishes old results.
+        const stillGranted = await adapter.hasHistoryPermission();
+        if (!active()) return;
+        if (!stillGranted) {
+          setEntries([]);
+          setStatus("permission");
+          return;
+        }
+        denied.current = false;
+        setEntries(visits);
+        setStatus("ready");
+      } catch (reason) {
+        if (active()) {
+          setEntries([]);
+          setReadError(
+            reason instanceof Error ? reason.message : String(reason),
+          );
+          setStatus("error");
+        }
+      }
+    },
+    [adapter],
+  );
 
   useEffect(() => {
     alive.current = true;
@@ -73,18 +84,21 @@ export function RecentVisits({
     const reload = () => {
       void refresh();
     };
+    const refocus = () => {
+      void refresh(true);
+    };
     const visible = () => {
-      if (document.visibilityState === "visible") reload();
+      if (document.visibilityState === "visible") refocus();
     };
     const unsubscribe = adapter.onHistoryChanged(reload);
-    window.addEventListener("focus", reload);
+    window.addEventListener("focus", refocus);
     document.addEventListener("visibilitychange", visible);
     reload();
     return () => {
       alive.current = false;
       revision.current++;
       unsubscribe();
-      window.removeEventListener("focus", reload);
+      window.removeEventListener("focus", refocus);
       document.removeEventListener("visibilitychange", visible);
     };
   }, [adapter, refresh]);
