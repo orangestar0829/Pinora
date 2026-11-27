@@ -4,7 +4,7 @@ Independent clean-room implementation based solely on supplied behavior specific
 
 React UI → domain services → BrowserAdapter → native Chromium or Firefox bookmarks/storage. Raw bookmarks are browser-owned; the extension stores no competing bookmark database. A normalized Map/tree and prebuilt search index exist only in memory. Browser events refresh snapshots; request generations suppress stale responses. System protection is derived from structure and metadata, never specific IDs.
 
-Settings schema v1 validates every persisted field; migrations normalize legacy unversioned values and preserve recoverable originals. Small settings and custom-image mappings live in chrome.storage.local; processed image blobs live in IndexedDB. Local appearance hint is disposable. `history` and `topSites` are optional permissions requested from their settings buttons; downloaded browser data is read in memory only. Manifest CSP denies network connections, allows local/blob/data images and locally bundled code. Opening a bookmark or content card is explicit browser navigation.
+Settings schema v1 validates every persisted field; migrations normalize legacy unversioned values and preserve recoverable originals. Small settings and custom-image mappings live in the browser's extension storage.local; processed image blobs live in IndexedDB. Local appearance hint is disposable. `history` and `topSites` are optional permissions requested from their settings buttons; downloaded browser data is read in memory only. Manifest CSP denies network connections, allows local/blob/data images and locally bundled code. Opening a bookmark or content card is explicit browser navigation.
 
 The first-phase UI, folder navigation, favicon/search, native CRUD and drag, settings/themes, custom-icon cropping, local wallpaper, recent visits, top sites, tests and unpacked packaging are implemented. See validation.md for evidence and remaining boundaries. Full-tree event refresh is deliberately simple Alpha behavior; rendering uses 200-item pagination rather than rendering the entire library.
 
@@ -13,7 +13,9 @@ flowchart TD
   UI[React dashboard / dialogs / settings] --> Domain[BookmarkService / SettingsService]
   Domain --> Adapter[BrowserAdapter]
   Adapter --> Chrome[Chromium bookmarks / storage / favicon]
+  Adapter --> Firefox[Firefox bookmarks / storage]
   Chrome --> Events[Bookmark events / storage.onChanged]
+  Firefox --> Events
   Events --> Domain
   UI --> Images[Safe image decode / crop / WebP encoding]
   Images --> Assets[IndexedDB asset store]
@@ -29,6 +31,8 @@ flowchart TD
 `src/storage` owns schema v1, migration, cross-tab Web Locks, small settings, blobs and image sanitation. Asset writes commit before mapping updates. Failed or cancelled mapping writes remove the new orphan. Successful replacements become eligible for collection only after 24 hours without current or recovery references. Collection and media commits acquire the asset lock before the settings lock; maintenance reads raw settings under that lock and never deletes without cross-tab locking. Race regressions are covered by `src/storage/*.test.ts`, `tests/e2e/media-races.spec.ts` and `tests/e2e/asset-maintenance.spec.ts`.
 
 `src/features/bookmarks` owns drag zones, dialogs, context menus and the grid. `src/features/settings` owns theme/layout controls, the wallpaper layer and image crop editor. React text rendering is used for all bookmark titles; executable URL schemes never appear as actionable native link targets.
+
+`scripts/package.ps1` creates the Chrome/Edge ZIP from `dist`. Its `-Firefox` option stages a separate copy, removes Chromium-only manifest fields and adds Firefox settings before creating an unsigned XPI. It leaves the Chromium manifest in `dist` unchanged. Generated packages, test reports and browser screenshots stay local or accompany a GitHub Release; only the three README screenshots are tracked under `artifacts`.
 
 ## Sources and clean-room record
 

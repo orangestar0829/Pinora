@@ -26,13 +26,17 @@ Ctrl / Cmd + F 搜索；方向键移动卡片焦点；Enter 打开；F2 编辑�
 
 ## 安装到 Firefox
 
-桌面版 Firefox 140 或更新版本可使用 Firefox 专用的 `.xpi` 文件。本地运行 `npm run package:firefox`，生成 `artifacts/Pinora-<版本>-firefox.xpi`。
+桌面版 Firefox 140 或更新版本可使用 Firefox 专用的 `.xpi` 文件。本地运行 `npm run package:firefox`，生成 `artifacts/Pinora-<版本>-firefox.xpi`。该命令生成的是未签名包，按以下步骤临时安装：
 
 1. 打开 `about:debugging#/runtime/this-firefox`。
 2. 点击“临时载入附加组件”，选择 `.xpi` 文件，无需解压。
 3. 打开新标签页。在 Firefox 询问是否保留新标签页更改时，选择保留。
 
-本地包未经签名，关闭 Firefox 后需要重新加载。普通版 Firefox 要长期安装，需要由 Mozilla 签名；可通过 Mozilla 附加组件平台申请非公开分发签名。Firefox 没有 Chromium 的本地网站图标接口，因此默认显示占位图标，自定义图标仍可使用。
+临时安装在重启 Firefox 后失效。要长期安装，可在 [Mozilla 附加组件平台](https://addons.mozilla.org/developers/addon/submit/)选择 **On your own（自行分发）**，申请非公开签名。提交 `.xpi` 时还需提供源码压缩包、依赖锁文件和构建说明，详见[官方提交流程](https://extensionworkshop.com/documentation/publish/submitting-an-add-on/#self-distribution)。
+
+下载签名后的 `.xpi`，打开 `about:addons`，从齿轮菜单选择“从文件安装附加组件”进行安装。签名包在重启后仍会保留。
+
+Firefox 没有 Chromium 的本地网站图标接口，因此默认显示占位图标，自定义图标仍可使用。
 
 ## 数据与权限
 
@@ -57,7 +61,7 @@ npm run test:e2e
 
 ### 本地调试
 
-本地开发无需打包：在扩展管理页开启“开发者模式”，通过“加载已解压的扩展”选择项目的 `dist` 目录。修改源码后执行 `npm run build`，再在扩展管理页点击“重新加载”并刷新新标签页。
+Chrome／Edge 本地开发无需打包：在扩展管理页开启“开发者模式”，通过“加载已解压的扩展”选择项目的 `dist` 目录。保留这个目录，浏览器运行时仍会读取其中的文件。修改源码后执行 `npm run build`，再在扩展管理页点击“重新加载”并刷新新标签页。Firefox 使用上面的专用包安装流程。
 
 ```powershell
 npm run dev
@@ -69,14 +73,22 @@ npm run dev
 
 ```powershell
 npm run package:extension
+npm run package:firefox
 ```
 
-打包命令需要 PowerShell，会先构建，再生成 `artifacts/Pinora-<版本>.zip`（不纳入版本控制）。发布时将该压缩包上传到 GitHub Release，供用户下载安装。
+打包命令需要 PowerShell，都会先构建：
+
+- `package:extension` 生成供 Chrome／Edge 使用的 `artifacts/Pinora-<版本>.zip`。
+- `package:firefox` 生成供 Firefox 使用的未签名包 `artifacts/Pinora-<版本>-firefox.xpi`。Firefox 专用配置仅写入该包，不修改 `dist` 中的 Chrome／Edge 配置。
+
+安装包不纳入版本控制。发布时将 `.zip` 或签名后的 `.xpi` 上传到 GitHub Release，供用户下载安装。
+
+`artifacts/` 仅跟踪下方链接的三张展示截图。测试生成的验收 JSON、浏览器截图、发布记录和安装包均留在本地；需要归档的发布证据可随对应 GitHub Release 上传。
 
 ## 项目资料
 
 - [架构](docs/architecture.md)、[界面与接口契约](docs/ui-contract.md)
-- [验证记录](docs/validation.md)、[验收结果](artifacts/acceptance.json)
+- [验证记录](docs/validation.md)
 - [浅色截图](artifacts/pinora-light.png)、[深色截图](artifacts/pinora-dark.png)、[设置截图](artifacts/pinora-settings.png)
 - [隐私说明](public/privacy.md)、[第三方许可](public/THIRD_PARTY_NOTICES.md)
 

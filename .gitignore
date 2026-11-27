@@ -5,7 +5,8 @@ playwright-report/
 *.tsbuildinfo
 .preview-profile/
 .test-profiles/
-artifacts/initial.png
-artifacts/*-probe.png
-artifacts/*.zip
-artifacts/*.xpi
+# Keep only the screenshots used by README.
+/artifacts/*
+!/artifacts/pinora-light.png
+!/artifacts/pinora-dark.png
+!/artifacts/pinora-settings.png

@@ -1,14 +1,38 @@
-# 0.0.2 验收记录
+# 验证记录
 
-日期：2026-10-07。目标代码：本仓库的生产构建。
+## Firefox 适配与兼容回归（2026-11-27）
 
-## 自动化证据
+功能代码：`1a3477b`（`feat: add Firefox extension support and packaging`），扩展版本仍为 `0.0.2`。以下为该次适配完成时的运行结果。
 
-`npm run check` 已通过；当前 13 个单测文件共 72 项单测覆盖 URL、系统及只读节点、路径、循环检查、索引、迁移、SVG、API 错误与刷新竞态、写成功读失败、Chromium 排序索引语义，以及删除、启动清理、历史记录和热门网站读取竞态。
+| 检查 | 环境 | 结果与覆盖 |
+| --- | --- | --- |
+| `npm run check` | 本地生产构建 | 类型检查、Lint、14 个文件共 84 项单测及构建通过 |
+| Chromium 兼容回归 | Chrome for Testing 153.0.8010.12 | 6 项通过：固定文件夹导航与搜索、主页内容设置、两项焦点点击回归、历史布局与原生历史读取 |
+| Edge 兼容回归 | Microsoft Edge 158 | 同一组 6 项通过 |
+| Firefox 冒烟验证 | Firefox 161，独立配置文件 | 新标签页接管、原生书签读取与变更、分隔符隐藏、拖动排序、设置写入、历史和热门网站权限弹窗，以及历史读取和撤权通过 |
+| 安装包检查 | Chrome／Edge ZIP 与 Firefox XPI | Chrome／Edge 包的 manifest 与源文件一致；Firefox 专用配置只写入 XPI，保留 `dist` 中的 Chromium 配置 |
 
-`npm run test:e2e` 使用 Playwright 的 Chrome for Testing，在新建的独立配置文件内加载真实 `dist` 扩展；本轮完整 Chromium E2E 为 12 项通过。记录见 `artifacts/acceptance.json`；测试源码为 `tests/e2e/extension.spec.ts`。
+复现 Chromium 的这组回归，先执行 `npm run build`，再运行：
 
-本轮 Microsoft Edge 运行布局和内容设置 E2E 共 2 项通过。复现时在 PowerShell 设置 `$env:PINORA_TEST_CHANNEL = 'msedge'`，执行指定 Playwright 用例后移除该环境变量。
+```powershell
+npm run test:e2e -- tests/e2e/fixed-folder.spec.ts tests/e2e/content-settings.spec.ts tests/e2e/focus-navigation.spec.ts tests/e2e/history.spec.ts tests/e2e/history-layout.spec.ts
+```
+
+使用 Edge 时，在单独的 PowerShell 会话中先设置 `$env:PINORA_TEST_CHANNEL = 'msedge'`，再运行同一命令。Firefox 冒烟验证使用独立工具和配置文件，当前 `npm run test:e2e` 仍面向 Chromium／Edge。
+
+测试运行生成的验收 JSON、浏览器截图和报告留在本地，不纳入版本控制。仓库只保留 README 引用的三张展示截图；需要归档的发布证据可随对应 GitHub Release 上传。
+
+## 初始验收（2026-10-07）
+
+目标代码为当时的 `0.0.2` 生产构建。以下记录保留该轮结果。
+
+### 自动化证据
+
+该轮 `npm run check` 已通过；当时 13 个单测文件共 72 项单测覆盖 URL、系统及只读节点、路径、循环检查、索引、迁移、SVG、API 错误与刷新竞态、写成功读失败、Chromium 排序索引语义，以及删除、启动清理、历史记录和热门网站读取竞态。
+
+`npm run test:e2e` 使用 Playwright 的 Chrome for Testing，在新建的独立配置文件内加载真实 `dist` 扩展；该轮完整 Chromium E2E 为 12 项通过。原生书签验收源码为 `tests/e2e/extension.spec.ts`，运行时会在本地生成验收 JSON 和截图。
+
+该轮 Microsoft Edge 运行布局和内容设置 E2E 共 2 项通过。复现时在 PowerShell 设置 `$env:PINORA_TEST_CHANNEL = 'msedge'`，执行指定 Playwright 用例后移除该环境变量。
 
 | 场景 | 证据 |
 | --- | --- |
@@ -29,7 +53,7 @@
 | 超过 200 项可继续访问 | 220 个匹配书签的第二页可见性断言 |
 | 5,000 书签／500 文件夹／10 层目录 | 域模型与索引单测；不是全规模 GUI 性能结论 |
 
-## 发现并修正
+### 发现并修正
 
 Chromium 同目录向后移动采用“移除前”的 index。适配器会读取当前原生位置并转换服务层的最终位置编号，真实双向拖拽及回归单测已覆盖。
 
@@ -37,7 +61,7 @@ Chromium 同目录向后移动采用“移除前”的 index。适配器会读�
 
 本轮 review 的三项问题均已修复。删除确认订阅当前书签树，递归授权来自当前已显示的警告；空文件夹使用非递归操作，预览适配器遵守相同约束。启动会等待最新读取完成后才进入图标清理，过期读取的失败不会覆盖最新成功结果。长标题允许断行并限制两行，完整名称保留在悬停提示中。
 
-Chromium 与 Edge 均通过扩展加载和响应式回归；当前 Chromium 全量 E2E 通过 12 个用例，包含设置中的历史记录/热门网站开关和行数、最近访问读取、删除更新与权限状态。浏览器原生可选权限弹窗仍需在目标浏览器中手动确认；无头测试使用隔离配置和必需权限副本验证实际数据读取。对应截图写入 `test-results`，该目录会被后续 Playwright 运行替换。
+该轮 Chromium 与 Edge 均通过扩展加载和响应式回归；Chromium 全量 E2E 通过 12 个用例，包含设置中的历史记录/热门网站开关和行数、最近访问读取、删除更新与权限状态。该轮无头测试使用隔离配置和必需权限副本验证实际数据读取，未覆盖浏览器原生可选权限弹窗。对应截图写入 `test-results`，该目录会被后续 Playwright 运行替换。
 
 ## Edge 焦点刷新回归（2026-11-20）
 
@@ -54,6 +78,6 @@ Edge 自动化回归使用隔离测试配置和必需权限副本；仅热门网
 
 - 页面请求监听覆盖扩展页面请求，不宣称控制浏览器自身的同步、更新或操作系统流量。
 - 启动时间样本来自本机、小型合成书签库；`warmReadyObservedMs` 是导航后观察到卡片可见的时间，不代表所有设备或冷启动保证。
-- Chromium E2E 是主要运行时证据；Firefox 尚未实现，商店签名、发布与名称检查尚未进行。
+- Chromium／Edge E2E 是主要自动化运行时证据；Firefox 已完成适配和上述冒烟验证，尚无 Firefox 全量 E2E。Mozilla 签名、商店发布与名称检查尚未进行。
 - 当前版本尚未实现完整多选、Downloads、备份和高级主题；Top Sites 与 History 仅提供本地读取、开关和行数控制。
-- 当前版本在原生书签事件后重新建立快照与索引；增量索引及 Blob 垃圾回收留待后续。
+- 当前版本在原生书签事件后重新建立快照与索引，尚未实现增量索引。未引用的图片 Blob 已支持带 24 小时宽限期的回收，并保护当前设置和恢复副本的引用；缺少 Web Locks 时跳过回收。

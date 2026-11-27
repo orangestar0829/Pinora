@@ -6,7 +6,7 @@ The UI is implemented in `src/app/**`, `src/components/**`, `src/features/**` an
 
 Import `createRuntime` from `src/domain/runtime`. Call once outside React rendering (or memoize). It returns `{ adapter, bookmarks, settings, start(): Promise<void>, stop(): void }`. Await `start()` and catch errors into a visible retry panel. Subscribe to each service with `service.subscribe(callback)`, returning an unsubscribe function. The services replace `bookmarks.tree` and `settings.value` on changes. They are suitable for `useSyncExternalStore(service.subscribe, () => service.tree/value)`; read `service.error` alongside snapshots (errors may not replace snapshots, so explicit rerender subscription can be useful). All async user actions must be caught and surfaced. `runtime.stop` removes browser listeners. Avoid duplicate start from StrictMode unless lifecycle handles it.
 
-`createAdapter` returns Chromium inside an extension. Outside extension it REQUIRES `?preview=1`, otherwise throws. Always render an explicit synthetic-data preview banner when `adapter.preview` is true. Preview bookmarks are in-memory and reset on refresh; preview settings persist in separate `preview.*` localStorage keys. Never describe preview tests as real extension acceptance.
+`createAdapter` selects the native Chromium or Firefox adapter inside an installed extension. Firefox uses the Promise-based `browser` namespace. Outside an extension it REQUIRES `?preview=1`, otherwise throws. Always render an explicit synthetic-data preview banner when `adapter.preview` is true. Preview bookmarks are in-memory and reset on refresh; preview settings persist in separate `preview.*` localStorage keys. Never describe preview tests as real extension acceptance.
 
 ## Tree
 
@@ -26,7 +26,7 @@ All writes await API completion and a refresh attempt; do not optimistically dis
 
 ## Open and favicon
 
-`adapter.open(url, mode)` with `'current' | 'new' | 'background'`. UI must preserve middle-click/Ctrl/Cmd/Shift conventions; use background for Ctrl/Cmd or middle, new for Shift. `adapter.favicon(url, size=64)` returns extension-local URL, undefined in preview. Use local fallback if load fails. Custom icon first, favicon next, locally generated initials last. `normalizeUrl` from domain/url rejects active schemes and normalizes bare hosts while preserving explicitly allowed schemes.
+`adapter.open(url, mode)` with `'current' | 'new' | 'background'`. UI must preserve middle-click/Ctrl/Cmd/Shift conventions; use background for Ctrl/Cmd or middle, new for Shift. `adapter.favicon(url, size=64)` returns an extension-local URL in Chromium and `undefined` in Firefox or preview. Use local fallback if unavailable or loading fails. Custom icon first, favicon next, locally generated initials last. `normalizeUrl` from domain/url rejects active schemes and normalizes bare hosts while preserving explicitly allowed schemes.
 
 ## Recent visits
 
