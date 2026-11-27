@@ -8,6 +8,7 @@ export interface BookmarkNode {
   index: number;
   children: string[];
   folder: boolean;
+  separator?: boolean;
   protected: boolean;
   readOnly: boolean;
   path: string[];
@@ -37,6 +38,8 @@ export function normalizeTree(raw: RawBookmark[]): BookmarkTree {
       parentId === undefined ||
       !!node.folderType ||
       (parentId !== undefined && roots.includes(parentId));
+    // Keep Firefox's separators in the child list for native sort positions.
+    const separator = node.type === "separator";
     const item: BookmarkNode = {
       id: node.id,
       parentId,
@@ -44,9 +47,10 @@ export function normalizeTree(raw: RawBookmark[]): BookmarkTree {
       url: node.url,
       index,
       children: [],
-      folder: node.url === undefined,
+      folder: !separator && node.url === undefined,
+      separator,
       protected: system,
-      readOnly: readOnly || !!node.unmodifiable,
+      readOnly: readOnly || separator || !!node.unmodifiable,
       path,
       hostname: hostname(node.url),
     };
@@ -64,7 +68,7 @@ export function normalizeTree(raw: RawBookmark[]): BookmarkTree {
       });
   }
   const searchIndex = [...nodes.values()]
-    .filter((n) => n.parentId !== undefined)
+    .filter((n) => n.parentId !== undefined && !n.separator)
     .map((n) => ({
       id: n.id,
       text: [

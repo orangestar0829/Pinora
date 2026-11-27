@@ -1,8 +1,9 @@
 import type { BrowserAdapter } from "../types/browser";
-import { chromiumAdapter, isExtension } from "./chromium";
+import { installedExtensionAdapter } from "./webExtension";
 import { createPreviewAdapter } from "./preview";
 export function createAdapter(): BrowserAdapter {
-  if (isExtension()) return chromiumAdapter;
+  const installed = installedExtensionAdapter();
+  if (installed) return installed;
   if (new URLSearchParams(location.search).get("preview") === "1")
     return createPreviewAdapter();
   throw new Error(

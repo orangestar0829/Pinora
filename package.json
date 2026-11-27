@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "format": "prettier --write src tests scripts *.json *.ts *.js index.html public/manifest.json",
-    "package:extension": "npm run build && powershell -NoProfile -File scripts/package.ps1"
+    "package:extension": "npm run build && powershell -NoProfile -File scripts/package.ps1",
+    "package:firefox": "npm run build && powershell -NoProfile -File scripts/package.ps1 -Firefox"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

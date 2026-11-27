@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chromiumAdapter } from "./chromium";
+import { chromiumAdapter } from "./webExtension";
 afterEach(() => vi.unstubAllGlobals());
 describe("Chromium move final-index contract", () => {
   it.each([

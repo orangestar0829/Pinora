@@ -43,7 +43,9 @@ export function useFolderNavigation(
         (node) =>
           node.id !== rootId && isInBookmarkFolder(tree, node.id, rootId),
       )
-    : (current?.children.map((id) => tree.nodes.get(id)!) ?? []);
+    : (current?.children
+        .map((id) => tree.nodes.get(id)!)
+        .filter((node) => !node.separator) ?? []);
   const navigate = useCallback(
     (id: string) => {
       if (!tree.nodes.get(id)?.folder || !isInBookmarkFolder(tree, id, rootId))

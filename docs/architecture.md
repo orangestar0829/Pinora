@@ -2,7 +2,7 @@
 
 Independent clean-room implementation based solely on supplied behavior specification; no third-party extension source or assets were accessed. Pinora is a development name, not a cleared store trademark.
 
-React UI → domain services → BrowserAdapter → Chromium native bookmarks/storage. Raw bookmarks are browser-owned; the extension stores no competing bookmark database. A normalized Map/tree and prebuilt search index exist only in memory. Browser events refresh snapshots; request generations suppress stale responses. System protection is derived from structure and metadata, never specific IDs.
+React UI → domain services → BrowserAdapter → native Chromium or Firefox bookmarks/storage. Raw bookmarks are browser-owned; the extension stores no competing bookmark database. A normalized Map/tree and prebuilt search index exist only in memory. Browser events refresh snapshots; request generations suppress stale responses. System protection is derived from structure and metadata, never specific IDs.
 
 Settings schema v1 validates every persisted field; migrations normalize legacy unversioned values and preserve recoverable originals. Small settings and custom-image mappings live in chrome.storage.local; processed image blobs live in IndexedDB. Local appearance hint is disposable. `history` and `topSites` are optional permissions requested from their settings buttons; downloaded browser data is read in memory only. Manifest CSP denies network connections, allows local/blob/data images and locally bundled code. Opening a bookmark or content card is explicit browser navigation.
 
@@ -22,9 +22,9 @@ flowchart TD
 
 ## Boundaries
 
-`src/browser` alone calls browser extension APIs. A future Firefox implementation can satisfy the same interface. The explicit web preview adapter uses separate synthetic bookmarks and storage; it is never selected inside an installed extension.
+`src/browser` alone calls browser extension APIs. Firefox uses its Promise-based `browser` namespace and falls back to placeholder icons without Chromium's local favicon API. Its bookmark separators stay in the tree for native sort positions but are not shown as cards or search results. The explicit web preview adapter uses separate synthetic bookmarks and storage; it is never selected inside an installed extension.
 
-`src/domain` owns editable-node, cycle, URL and snapshot rules. Chromium's same-parent forward index adjustment stays in its adapter. Native API completion is authoritative; a subsequent read failure surfaces as a refresh error, not an unsuccessful save that encourages duplicate creation.
+`src/domain` owns editable-node, cycle, URL and snapshot rules. Same-parent forward index adjustment stays in the extension adapter. Native API completion is authoritative; a subsequent read failure surfaces as a refresh error, not an unsuccessful save that encourages duplicate creation.
 
 `src/storage` owns schema v1, migration, cross-tab Web Locks, small settings, blobs and image sanitation. Asset writes commit before mapping updates. Failed or cancelled mapping writes remove the new orphan. Successful replacements become eligible for collection only after 24 hours without current or recovery references. Collection and media commits acquire the asset lock before the settings lock; maintenance reads raw settings under that lock and never deletes without cross-tab locking. Race regressions are covered by `src/storage/*.test.ts`, `tests/e2e/media-races.spec.ts` and `tests/e2e/asset-maintenance.spec.ts`.
 

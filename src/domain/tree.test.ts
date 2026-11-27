@@ -44,6 +44,35 @@ test("search index covers host and ancestor folder", () => {
   expect(searchTree(tree, "work github").map((n) => n.id)).toEqual(["a"]);
   expect(searchTree(tree, "")).toEqual([]);
 });
+test("keeps Firefox separators in native order without treating them as bookmarks or folders", () => {
+  const tree = normalizeTree([
+    {
+      id: "root",
+      title: "Root",
+      children: [
+        {
+          id: "folder",
+          title: "Work",
+          children: [
+            { id: "separator", title: "", type: "separator", url: "data:" },
+            { id: "bookmark", title: "Code", url: "https://github.com" },
+          ],
+        },
+      ],
+    },
+  ]);
+  expect(tree.nodes.get("folder")?.children).toEqual(["separator", "bookmark"]);
+  expect(tree.nodes.get("separator")).toMatchObject({
+    separator: true,
+    folder: false,
+    readOnly: true,
+  });
+  expect(tree.nodes.get("bookmark")?.index).toBe(1);
+  expect(searchTree(tree, "work").map((node) => node.id)).toEqual([
+    "folder",
+    "bookmark",
+  ]);
+});
 test("cycles are rejected and deep trees do not recurse", () => {
   const cycle: RawBookmark = { id: "cycle", title: "", children: [] };
   cycle.children!.push(cycle);

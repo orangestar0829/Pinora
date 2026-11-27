@@ -1,6 +1,6 @@
 # Pinora 0.0.2
 
-以浏览器原生书签为中心的本地新标签页扩展，适用于 Chrome 和 Edge。无需账户，无广告、无遥测。
+以浏览器原生书签为中心的本地新标签页扩展，适用于 Chrome、Edge 和桌面版 Firefox。无需账户，无广告、无遥测。
 
 ![Pinora 浅色界面](artifacts/pinora-light.png)
 
@@ -24,9 +24,19 @@ Ctrl / Cmd + F 搜索；方向键移动卡片焦点；Enter 打开；F2 编辑�
 
 升级时下载新版本覆盖解压目录，在扩展管理页点击“重新加载”，再刷新已打开的新标签页。
 
+## 安装到 Firefox
+
+桌面版 Firefox 140 或更新版本可使用 Firefox 专用的 `.xpi` 文件。本地运行 `npm run package:firefox`，生成 `artifacts/Pinora-<版本>-firefox.xpi`。
+
+1. 打开 `about:debugging#/runtime/this-firefox`。
+2. 点击“临时载入附加组件”，选择 `.xpi` 文件，无需解压。
+3. 打开新标签页。在 Firefox 询问是否保留新标签页更改时，选择保留。
+
+本地包未经签名，关闭 Firefox 后需要重新加载。普通版 Firefox 要长期安装，需要由 Mozilla 签名；可通过 Mozilla 附加组件平台申请非公开分发签名。Firefox 没有 Chromium 的本地网站图标接口，因此默认显示占位图标，自定义图标仍可使用。
+
 ## 数据与权限
 
-基础权限为 `bookmarks`、`storage` 和 `favicon`，分别用于原生书签、本地设置和浏览器本地网站图标。可选权限 `history`、`topSites` 仅在设置中点击授权后获取，分别用于最近访问和热门网站；未授权不读取，撤销权限后清空对应显示。
+基础权限为 `bookmarks` 和 `storage`，分别用于原生书签和本地设置。Chrome／Edge 另用 `favicon` 读取浏览器本地网站图标。可选权限 `history`、`topSites` 仅在设置中点击授权后获取，分别用于最近访问和热门网站；未授权不读取，撤销权限后清空对应显示。
 
 Pinora 不上传书签、历史记录或常访网站列表。设置、自定义图标和壁纸仅保存在本机；历史记录和热门网站只读取到页面内存，不另行持久化。浏览器自身启用的书签同步仍由浏览器管理。设置变更会同步到同一浏览器配置文件中已打开的新标签页。
 
@@ -70,4 +80,4 @@ npm run package:extension
 - [浅色截图](artifacts/pinora-light.png)、[深色截图](artifacts/pinora-dark.png)、[设置截图](artifacts/pinora-settings.png)
 - [隐私说明](public/privacy.md)、[第三方许可](public/THIRD_PARTY_NOTICES.md)
 
-截图中的书签为隔离测试配置文件里的合成样例。当前版本面向 Chromium 浏览器，尚不支持 Firefox。
+截图中的书签为隔离测试配置文件里的合成样例。

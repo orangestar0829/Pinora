@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chromiumAdapter } from "./chromium";
+import { chromiumAdapter } from "./webExtension";
 import { createPreviewAdapter } from "./preview";
 
 function event<T extends unknown[]>() {
@@ -104,6 +104,18 @@ describe("recent browser visits", () => {
     expect(history.onVisitRemoved.listeners.size).toBe(0);
     expect(permissions.onAdded.listeners.size).toBe(0);
     expect(permissions.onRemoved.listeners.size).toBe(0);
+  });
+
+  it("notifies when Firefox withdraws the history events before permission removal", async () => {
+    const { permissions, history } = setup(true);
+    const listener = vi.fn();
+    const dispose = chromiumAdapter.onHistoryChanged(listener);
+    await Promise.resolve();
+    expect(history.onVisited.listeners.size).toBe(1);
+    Object.assign(history, { onVisited: undefined, onVisitRemoved: undefined });
+    permissions.onRemoved.emit({ permissions: ["history"] });
+    expect(listener).toHaveBeenCalledOnce();
+    dispose();
   });
 
   it.each(["dispose", "revoke"])(

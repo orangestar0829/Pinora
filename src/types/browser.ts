@@ -7,6 +7,7 @@ export interface RawBookmark {
   children?: RawBookmark[];
   unmodifiable?: string;
   folderType?: string;
+  type?: string;
 }
 export type OpenMode = "current" | "new" | "background";
 export interface RecentVisit {

@@ -8,3 +8,4 @@ playwright-report/
 artifacts/initial.png
 artifacts/*-probe.png
 artifacts/*.zip
+artifacts/*.xpi

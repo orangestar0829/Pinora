@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chromiumAdapter } from "./chromium";
+import { chromiumAdapter } from "./webExtension";
 import { createPreviewAdapter } from "./preview";
 
 function event<T extends unknown[]>() {
