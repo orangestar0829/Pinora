@@ -1,0 +1,5 @@
+Copyright (c) 2026 orangestar0829. All rights reserved.
+
+Pinora's original code and assets are proprietary. This distribution does not grant permission to modify, redistribute, sublicense or sell that original code or those assets.
+
+Third-party components retain their respective licenses. See the bundled THIRD_PARTY_NOTICES.md and licenses/ directory.

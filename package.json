@@ -13,7 +13,8 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "format": "prettier --write src tests scripts *.json *.ts *.js index.html public/manifest.json",
     "package:extension": "npm run build && powershell -NoProfile -File scripts/package.ps1",
-    "package:firefox": "npm run build && powershell -NoProfile -File scripts/package.ps1 -Firefox"
+    "package:firefox": "npm run build && powershell -NoProfile -File scripts/package.ps1 -Firefox",
+    "package:submission": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-submission.ps1"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

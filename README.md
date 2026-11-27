@@ -85,6 +85,12 @@ npm run package:firefox
 
 `artifacts/` 仅跟踪下方链接的三张展示截图。测试生成的验收 JSON、浏览器截图、发布记录和安装包均留在本地；需要归档的发布证据可随对应 GitHub Release 上传。
 
+### 商店提交材料
+
+运行 `npm.cmd run package:submission`，再运行 `node scripts/capture-store-assets.mjs`，生成 `artifacts/submission/Pinora-0.0.2/`：包括 Edge ZIP、Firefox XPI、审核源码 ZIP、构建说明、商店文案、权限用途、审核备注、图标和 1280×800 截图。素材脚本使用安装在本机的 Edge 和独立测试档案。
+
+上传文件、公开隐私链接和表单填写说明见[商店提交指南](docs/store/README.md)。Firefox XPI 需由 Mozilla 签名后才能正式分发；源码包与对应 XPI 一同提交审核。
+
 ## 项目资料
 
 - [架构](docs/architecture.md)、[界面与接口契约](docs/ui-contract.md)

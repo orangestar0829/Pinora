@@ -12,9 +12,25 @@ $version = $manifest.version
 if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw 'Invalid extension version.' }
 $artifactDirectory = Join-Path $projectDirectory 'artifacts'
 New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+function Write-ExtensionArchive([string]$directory, [string]$destination) {
+    if (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Force }
+    $zip = [IO.Compression.ZipFile]::Open($destination, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($item in Get-ChildItem -LiteralPath $directory -Recurse -File) {
+            $entry = $item.FullName.Substring($directory.Length + 1).Replace('\', '/')
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $zip, $item.FullName, $entry, [IO.Compression.CompressionLevel]::Optimal
+            )
+        }
+    } finally {
+        $zip.Dispose()
+    }
+}
 if (-not $Firefox) {
     $archivePath = Join-Path $artifactDirectory "Pinora-$version.zip"
-    Compress-Archive -Path (Join-Path $outputDirectory '*') -DestinationPath $archivePath -Force
+    Write-ExtensionArchive $outputDirectory $archivePath
     Write-Output $archivePath
     return
 }
@@ -38,24 +54,7 @@ try {
     $firefoxManifest = $manifest | ConvertTo-Json -Depth 10
     [IO.File]::WriteAllText((Join-Path $extension 'manifest.json'), $firefoxManifest)
     $archive = Join-Path $stage 'extension.xpi'
-    Add-Type -AssemblyName System.IO.Compression
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $zip = [IO.Compression.ZipFile]::Open($archive, [IO.Compression.ZipArchiveMode]::Create)
-    try {
-        # Firefox must be able to resolve nested JS, CSS and icons in the XPI.
-        foreach ($item in Get-ChildItem -LiteralPath $extension -Recurse) {
-            $entry = $item.FullName.Substring($extension.Length + 1).Replace('\', '/')
-            if ($item.PSIsContainer) {
-                [void]$zip.CreateEntry("$entry/")
-            } else {
-                [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
-                    $zip, $item.FullName, $entry, [IO.Compression.CompressionLevel]::Optimal
-                )
-            }
-        }
-    } finally {
-        $zip.Dispose()
-    }
+    Write-ExtensionArchive $extension $archive
     Move-Item -LiteralPath $archive -Destination $archivePath -Force
 } finally {
     Remove-Item -LiteralPath $stage -Recurse -Force
