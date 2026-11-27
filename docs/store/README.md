@@ -30,6 +30,8 @@
 1. Edge：[注册开发者](https://learn.microsoft.com/en-us/microsoft-edge/extensions/publish/create-dev-account)，进入 [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge/overview)，新建扩展并上传 ZIP。选择公开或隐藏分发，填写介绍、图标、隐私链接与权限用途，附审核备注后提交。
 2. Firefox：进入 [AMO 提交页](https://addons.mozilla.org/developers/addon/submit/)，选 On this site（公开上架）或 On your own（只签名自行分发），上传 XPI 和源码 ZIP，处理自动验证结果后提交。完成后下载签名包；不要把未签名包当作正式可长期安装的版本分发。
 
+Firefox 的兼容平台仅选择桌面版。当前 0.0.2 在 AMO 自动验证中为 0 个错误、3 个警告：1 条涉及 Android 数据声明的最低版本，另 2 条涉及 React DOM 内部的 innerHTML。桌面最低版本保持 140，不声明 Android 支持；各警告来源已写入 `copy/reviewer-notes.md` 的 Automated validation warnings 部分，可一同粘贴到审核备注。此结果允许继续提交，最终签名和审核结果以 AMO 后台为准。
+
 开发者账号、商店条款和最终提交由账号本人完成。支持入口使用 GitHub Issues，无需公开个人邮箱。
 
 ## 材料生成与复现

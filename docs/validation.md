@@ -1,5 +1,14 @@
 # 验证记录
 
+## AMO 自动验证警告核对（2026-11-27）
+
+用户提供的 `Pinora-0.0.2-firefox.xpi` 自动验证报告为 0 个错误、3 个警告，报告显示“附加组件通过验证”。
+
+- Android 版本警告：`data_collection_permissions` 在桌面 Firefox 140、Android Firefox 142 开始支持。当前包只面向桌面，保留 `gecko.strict_min_version = 140.0` 并省略 `gecko_android`；提交时仅选择桌面平台。
+- 两条 `innerHTML` 警告：`assets/index-C1fmyFgT.js` 第 49 行第 1842、4776 列，分别对应 React DOM 19.3.0 依赖中 `setProp` 和 `setPropOnCustomElement` 对 `dangerouslySetInnerHTML` 的实现。应用源码没有使用这些 HTML 写入接口；书签和历史标题使用 React 文本节点渲染。
+
+本次只补充审核备注及提交说明，保留原安装包的功能和兼容范围。警告说明见[审核备注](store/reviewer-notes.md)。
+
 ## Firefox 适配与兼容回归（2026-11-27）
 
 功能代码：`1a3477b`（`feat: add Firefox extension support and packaging`），扩展版本仍为 `0.0.2`。以下为该次适配完成时的运行结果。

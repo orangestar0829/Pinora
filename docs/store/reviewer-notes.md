@@ -24,3 +24,12 @@ The submitted file is the unsigned Pinora-0.0.2-firefox.xpi, targeting desktop F
 Source code is supplied separately as Pinora-0.0.2-source.zip. BUILDING.md at its root records the exact environment and build commands. npm dependencies are pinned by package-lock.json. The build uses Windows PowerShell 5.1 for archive creation; please use the documented Windows environment. The bundled third-party notices and licenses are in public/ and are included in the install package.
 
 The manifest declares required data collection permissions as ["none"]. Bookmarks and optional history/top-sites data are processed on the device. No telemetry, analytics or upload is performed.
+
+## Automated validation warnings
+
+The AMO validation report dated November 27, 2026 passed with zero errors and three warnings:
+
+- Android minimum version: Pinora targets desktop Firefox only. browser_specific_settings.gecko_android is intentionally omitted. The desktop minimum is 140.0, which supports data_collection_permissions; that feature was introduced in Firefox for Android 142. This submission does not request Android compatibility.
+- Two innerHTML assignments: assets/index-C1fmyFgT.js, line 49, columns 1842 and 4776, are from the bundled React DOM 19.3.0 implementation of dangerouslySetInnerHTML. The corresponding dependency source is node_modules/react-dom/cjs/react-dom-client.production.js, in setProp and setPropOnCustomElement. Pinora's application source does not use dangerouslySetInnerHTML or assign to innerHTML. Bookmark and history titles are rendered as React text children, not as HTML.
+
+The dependency version is recorded in package-lock.json; npm ci restores the dependency source for review. Desktop compatibility is documented at https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/browser_specific_settings and data consent support at https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/ .
