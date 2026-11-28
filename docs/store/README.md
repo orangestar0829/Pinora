@@ -10,7 +10,7 @@
 | 简体中文名称、简介、详细介绍 | `copy/listing-zh-CN.md` |
 | 英文介绍与版本说明 | `copy/listing-en-US.md`，明确 UI 为简体中文 |
 | 权限说明与数据表单 | `copy/permissions.md` |
-| 审核备注 | `copy/reviewer-notes.md` |
+| 审核备注 | `copy/reviewer-notes.md`，全文可粘贴，AMO 上限 3000 字符 |
 | Firefox 自身许可证 | `copy/firefox-license.txt`，当前按保留全部权利准备 |
 | 商店图标 | `assets/icon-300.png`，另有 128 像素版 |
 | 商店截图 | `assets/01-light.png`、`02-dark.png`、`03-settings.png` |

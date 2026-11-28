@@ -1,35 +1,23 @@
-# Reviewer notes — Pinora 0.0.2
+# Reviewer notes - Pinora 0.0.2
 
-## Overview
-
-Pinora is a Manifest V3 new tab extension built with React, TypeScript and Vite. The UI is in Simplified Chinese. No account, password, subscription or external service is needed. Please test with a disposable browser profile and synthetic bookmarks: edits and deletions affect native browser bookmarks.
+Pinora is a Manifest V3 new-tab extension using React, TypeScript and Vite. UI: Simplified Chinese. No account, payment or external service is needed. Use a disposable profile and test bookmarks: edits/deletions change native bookmarks.
 
 ## Test steps
+1. Install and open a new tab; accept the new-tab change if prompted. Create bookmarks and a child folder in the browser bookmark manager.
+2. In top-right settings, use 外观 (Appearance) > 书签文件夹 (Bookmark folder) to select a folder. Browse folders, search, open/edit/move bookmarks and drag to reorder. Cancel deletion unless using test data.
+3. Test light/dark/system themes and 布局 (Layout). Settings persist locally and update other open Pinora tabs in the same profile.
+4. In 布局 > 主页内容 (Home content), enable 最近访问 (Recent visits) or 热门网站 (Top sites) using their permission buttons. Both permissions are optional. Visit test sites first. These sections appear only at the home folder with no search. No permission means no data read; revoking it clears the display.
+5. In 背景 (Background), test solid/gradient/local wallpaper. Upload a 自定义图标 (Custom icon) from a bookmark menu. Images stay in local IndexedDB.
 
-1. Install the package and open a new tab. Accept the browser's prompt to keep the new tab change, if shown.
-2. Add bookmarks and a child folder using the browser's native bookmark manager. Pinora should display them. If needed, click the top-right settings button “外观与设置” (Appearance and settings), then “外观” (Appearance) and choose “书签文件夹” (Bookmark folder).
-3. Open a child folder and return to its parent. Search from the top bar. Open a bookmark's menu to edit or move it, or drag to reorder it. Cancel a deletion prompt unless you intend to change test data.
-4. In settings, choose “浅色” (Light), “深色” (Dark) or system theme. Adjust layout under “布局” (Layout). Changes are saved locally and synchronize to other open Pinora tabs in this browser profile.
-5. In “布局” > “主页内容” (Layout > Home content), use the permission button for “最近访问” (Recent visits) or “热门网站” (Top sites). Each permission is optional and requested only from a user action. Open test websites first if the test profile has no browser history. These sections appear only at the home folder with no active search. Without permission there is no history/top-sites read. Revoking permission clears the corresponding display.
-6. In “背景” (Background), select a solid color, gradient or a local wallpaper. In a bookmark's menu, use “自定义图标” (Custom icon) to upload a local icon. Images are stored in the extension's local IndexedDB.
+## Packages
+Edge: Pinora-0.0.2.zip uses bookmarks, storage and local favicon; history/topSites are optional.
+Firefox: Pinora-0.0.2-firefox.xpi targets desktop Firefox 140+. ID: pinora@pinora.local. No Chromium-only favicon permission or minimum_chrome_version; fallback icons are used.
 
-## Edge-specific notes
-
-The submitted file is Pinora-0.0.2.zip. It requests bookmarks, storage and favicon; history and topSites are optional. Favicon access uses the browser's local favicon API. All runtime code is bundled; there is no remote executable code or data upload.
-
-## Firefox-specific notes
-
-The submitted file is the unsigned Pinora-0.0.2-firefox.xpi, targeting desktop Firefox 140.0 and later. The add-on ID is pinora@pinora.local. The package removes the Chromium-only favicon permission and minimum_chrome_version. Firefox uses fallback site icons.
-
-Source code is supplied separately as Pinora-0.0.2-source.zip. BUILDING.md at its root records the exact environment and build commands. npm dependencies are pinned by package-lock.json. The build uses Windows PowerShell 5.1 for archive creation; please use the documented Windows environment. The bundled third-party notices and licenses are in public/ and are included in the install package.
-
-The manifest declares required data collection permissions as ["none"]. Bookmarks and optional history/top-sites data are processed on the device. No telemetry, analytics or upload is performed.
+## Source and privacy
+Build source: Pinora-0.0.2-source.zip. Follow its root BUILDING.md for exact environment versions and build commands. Use Windows x64 and PowerShell 5.1 for packaging. package-lock.json pins npm dependencies; npm ci restores them. Third-party notices/licenses are bundled.
+All runtime code is bundled. No remote executable code, telemetry, analytics or data upload. Bookmarks and optional history/top-sites data stay on device. Firefox data_collection_permissions.required is ["none"].
 
 ## Automated validation warnings
-
-The AMO validation report dated November 27, 2026 passed with zero errors and three warnings:
-
-- Android minimum version: Pinora targets desktop Firefox only. browser_specific_settings.gecko_android is intentionally omitted. The desktop minimum is 140.0, which supports data_collection_permissions; that feature was introduced in Firefox for Android 142. This submission does not request Android compatibility.
-- Two innerHTML assignments: assets/index-C1fmyFgT.js, line 49, columns 1842 and 4776, are from the bundled React DOM 19.3.0 implementation of dangerouslySetInnerHTML. The corresponding dependency source is node_modules/react-dom/cjs/react-dom-client.production.js, in setProp and setPropOnCustomElement. Pinora's application source does not use dangerouslySetInnerHTML or assign to innerHTML. Bookmark and history titles are rendered as React text children, not as HTML.
-
-The dependency version is recorded in package-lock.json; npm ci restores the dependency source for review. Desktop compatibility is documented at https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/browser_specific_settings and data consent support at https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/ .
+AMO report, 2026-11-27: 0 errors, 3 warnings.
+- Android: this submission targets desktop only; gecko_android is omitted. data_collection_permissions is supported on desktop 140 but Android 142. Android compatibility is not requested.
+- Two innerHTML warnings in assets/index-C1fmyFgT.js, line 49, columns 1842/4776: React DOM 19.3.0's dangerouslySetInnerHTML implementation, in setProp/setPropOnCustomElement (node_modules/react-dom/cjs/react-dom-client.production.js). Pinora does not call dangerouslySetInnerHTML or assign innerHTML; bookmark/history titles use React text children.
